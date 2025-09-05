@@ -47,31 +47,31 @@ public class PaymentService
         //    (somente se estiver habilitado em config)
         //if (_opt.Value.AutoCapture)
         //{
-            payment.Status = Payment.Api.Domain.PaymentStatus.Captured;
-            payment.UpdatedAt = DateTimeOffset.UtcNow;
+            //payment.Status = Payment.Api.Domain.PaymentStatus.Captured;
+            //payment.UpdatedAt = DateTimeOffset.UtcNow;
 
-            var evt = new
-            {
-                @event = "payment.confirmed",
-                version = "1",
-                occurredAt = DateTimeOffset.UtcNow,
-                userId = payment.UserId,
-                purchaseId = payment.PaymentId,
-                items = payment.Items.Select(i => new
-                {
-                    gameId = i.GameId,
-                    quantity = i.Quantity,
-                    price = i.UnitPrice
-                })
-            };
+            //var evt = new
+            //{
+            //    @event = "payment.confirmed",
+            //    version = "1",
+            //    occurredAt = DateTimeOffset.UtcNow,
+            //    userId = payment.UserId,
+            //    purchaseId = payment.PaymentId,
+            //    items = payment.Items.Select(i => new
+            //    {
+            //        gameId = i.GameId,
+            //        quantity = i.Quantity,
+            //        price = i.UnitPrice
+            //    })
+            //};
 
-            _db.Outbox.Add(new Payment.Api.Domain.OutboxMessage
-            {
-                Type = "payment.confirmed",
-                PayloadJson = JsonSerializer.Serialize(evt)
-            });
+            //_db.Outbox.Add(new Payment.Api.Domain.OutboxMessage
+            //{
+            //    Type = "payment.confirmed",
+            //    PayloadJson = JsonSerializer.Serialize(evt)
+            //});
 
-            await _db.SaveChangesAsync(ct);
+            //await _db.SaveChangesAsync(ct);
         //}
 
         // 5) Resposta + registro da idempotência

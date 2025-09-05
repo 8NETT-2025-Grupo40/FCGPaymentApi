@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Amazon.SQS;
+using Microsoft.OpenApi.Models;
 using Payment.Api.Infrastructure;
 using Payment.Api.Services;
 using Payment.Api.Psp;
 using Payment.Api.Contracts;
 using Payment.Api.Domain;
+using Payment.Api.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,9 +19,10 @@ builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
 builder.Services.AddAWSService<IAmazonSQS>();
 
 // Services
-builder.Services.AddSingleton<IPspClient, FakePspClient>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddHostedService<OutboxPublisher>();
+builder.Services.Configure<Payment.Api.Psp.PspOptions>(builder.Configuration.GetSection("Psp"));
+builder.Services.AddHttpClient<Payment.Api.Psp.IPspClient, Payment.Api.Psp.HttpPspClient>();
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -50,6 +53,19 @@ app.MapPost("/payments", async (
     var resp = await svc.CreateAsync(req, key!, psp, ct);
     return Results.Created($"/payments/{resp.PaymentId}", resp);
 })
+.WithOpenApi(op =>
+{
+    op.Parameters ??= new List<OpenApiParameter>();
+    op.Parameters.Add(new OpenApiParameter
+    {
+        Name = "Idempotency-Key",
+        In = ParameterLocation.Header,
+        Required = true,
+        Description = "Chave de idempotência para tornar o POST seguro a retries.",
+        Schema = new OpenApiSchema { Type = "string" }
+    });
+    return op;
+})
 .WithName("CreatePayment")
 .Produces<CreatePaymentResponse>(StatusCodes.Status201Created)
 .Produces(StatusCodes.Status400BadRequest);
@@ -57,8 +73,16 @@ app.MapPost("/payments", async (
 // Get payment
 app.MapGet("/payments/{id:guid}", async (Guid id, PaymentsDbContext db, CancellationToken ct) =>
 {
-    var p = await db.Payments.Include(x => x.Items).FirstOrDefaultAsync(x => x.PaymentId == id, ct);
-    return p is null ? Results.NotFound() : Results.Ok(p);
+    Payment.Api.Domain.Payment? p = await db.Payments.Include(x => x.Items).FirstOrDefaultAsync(x => x.PaymentId == id, ct);
+
+
+    if (p == null)
+    {
+        return Results.NotFound();
+    }
+
+    PaymentResponse response = new(p);
+    return Results.Ok(response);
 })
 .WithName("GetPayment")
 .Produces(StatusCodes.Status404NotFound);
