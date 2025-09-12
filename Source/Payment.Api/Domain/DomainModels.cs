@@ -1,4 +1,4 @@
-namespace Payment.Api.Domain;
+namespace Fcg.Payment.API.Domain;
 
 public enum PaymentStatus { Pending, Authorized, Captured, Failed, Refunded }
 

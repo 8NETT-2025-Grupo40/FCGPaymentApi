@@ -1,10 +1,10 @@
 using System.Text.Json;
 using Amazon.SQS;
 using Amazon.SQS.Model;
+using Fcg.Payment.API.Domain;
 using Microsoft.EntityFrameworkCore;
-using Payment.Api.Domain;
 
-namespace Payment.Api.Infrastructure;
+namespace Fcg.Payment.API.Infrastructure;
 
 public class OutboxPublisher : BackgroundService
 {
@@ -14,19 +14,19 @@ public class OutboxPublisher : BackgroundService
 
     public OutboxPublisher(IServiceScopeFactory sf, IAmazonSQS sqs, IConfiguration cfg)
     {
-        _sf = sf; _sqs = sqs; _queueUrl = cfg["Sqs:PaymentConfirmedQueueUrl"] ?? "";
+        this._sf = sf; this._sqs = sqs; this._queueUrl = cfg["Sqs:PaymentConfirmedQueueUrl"] ?? "";
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (string.IsNullOrWhiteSpace(_queueUrl))
+        if (string.IsNullOrWhiteSpace(this._queueUrl))
             Console.WriteLine("Sqs:PaymentConfirmedQueueUrl not configured. OutboxPublisher sleeping.");
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (!string.IsNullOrWhiteSpace(_queueUrl))
+            if (!string.IsNullOrWhiteSpace(this._queueUrl))
             {
-                using var scope = _sf.CreateScope();
+                using var scope = this._sf.CreateScope();
                 var db = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
 
                 var batch = await db.Outbox
@@ -41,7 +41,7 @@ public class OutboxPublisher : BackgroundService
                     {
                         var req = new SendMessageRequest
                         {
-                            QueueUrl = _queueUrl,
+                            QueueUrl = this._queueUrl,
                             MessageBody = msg.PayloadJson,
                             MessageAttributes = new()
                             {
@@ -49,7 +49,7 @@ public class OutboxPublisher : BackgroundService
                             }
                         };
 
-                        if (IsFifoQueue(_queueUrl))
+                        if (IsFifoQueue(this._queueUrl))
                         {
                             // Escolha de agrupamento: por compra (purchaseId) ou por usuário (userId).
                             var (groupId, dedupId) = BuildFifoMetadata(msg);
@@ -58,7 +58,7 @@ public class OutboxPublisher : BackgroundService
                             req.MessageDeduplicationId = dedupId;            // Opcional se ContentBasedDedup=true
                         }
 
-                        await _sqs.SendMessageAsync(req, stoppingToken);
+                        await this._sqs.SendMessageAsync(req, stoppingToken);
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)

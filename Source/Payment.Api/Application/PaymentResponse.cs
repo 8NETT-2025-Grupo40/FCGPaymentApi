@@ -1,6 +1,6 @@
-﻿using Payment.Api.Domain;
+﻿using Fcg.Payment.API.Domain;
 
-namespace Payment.Api.Application
+namespace Fcg.Payment.API.Application
 {
     public class PaymentResponse
     {

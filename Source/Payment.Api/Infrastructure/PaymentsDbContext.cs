@@ -1,16 +1,16 @@
+using Fcg.Payment.API.Domain;
 using Microsoft.EntityFrameworkCore;
-using Payment.Api.Domain;
 
-namespace Payment.Api.Infrastructure;
+namespace Fcg.Payment.API.Infrastructure;
 
 public class PaymentsDbContext : DbContext
 {
     public PaymentsDbContext(DbContextOptions<PaymentsDbContext> o) : base(o) { }
 
-    public DbSet<Domain.Payment> Payments => Set<Domain.Payment>();
-    public DbSet<PaymentItem> PaymentItems => Set<PaymentItem>();
-    public DbSet<OutboxMessage> Outbox => Set<OutboxMessage>();
-    public DbSet<IdempotencyKey> Idempotency => Set<IdempotencyKey>();
+    public DbSet<Domain.Payment> Payments => this.Set<Domain.Payment>();
+    public DbSet<PaymentItem> PaymentItems => this.Set<PaymentItem>();
+    public DbSet<OutboxMessage> Outbox => this.Set<OutboxMessage>();
+    public DbSet<IdempotencyKey> Idempotency => this.Set<IdempotencyKey>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {

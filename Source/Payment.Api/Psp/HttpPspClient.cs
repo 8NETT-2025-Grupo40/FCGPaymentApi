@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 
-namespace Payment.Api.Psp
+namespace Fcg.Payment.API.Psp
 {
 
     public class PspOptions
@@ -15,9 +15,9 @@ namespace Payment.Api.Psp
 
         public HttpPspClient(HttpClient http, IOptions<PspOptions> opt)
         {
-            _http = http;
-            _opt = opt.Value;
-            _http.BaseAddress = new Uri(_opt.BaseUrl);
+            this._http = http;
+            this._opt = opt.Value;
+            this._http.BaseAddress = new Uri(this._opt.BaseUrl);
         }
 
         public async Task<(string checkoutUrl, string pspRef)> CreateCheckoutAsync(Domain.Payment payment, CancellationToken ct)
@@ -29,7 +29,7 @@ namespace Payment.Api.Psp
                 items = payment.Items.Select(i => new { gameId = i.GameId, quantity = i.Quantity, unitPrice = i.UnitPrice })
             };
 
-            var resp = await _http.PostAsJsonAsync("/psp/checkout/sessions", payload, ct);
+            var resp = await this._http.PostAsJsonAsync("/psp/checkout/sessions", payload, ct);
             resp.EnsureSuccessStatusCode();
 
             var json = await resp.Content.ReadFromJsonAsync<ResponseDto>(cancellationToken: ct)
@@ -61,7 +61,7 @@ namespace Payment.Api.Psp
         // compat com sua interface atual
         public (string, string, Domain.PaymentStatus) ParseWebhook(string payload)
         {
-            var (evt, status, refId) = Parse(payload);
+            var (evt, status, refId) = this.Parse(payload);
             return (evt, refId, status);
         }
 

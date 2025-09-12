@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -15,5 +15,10 @@
     <PackageReference Include="AWSSDK.SQS" Version="3.7.300.16" />
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.5.22" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Fcg.Payment.Application\Fcg.Payment.Application.csproj" />
+    <ProjectReference Include="..\..\Fcg.Payment.Domain\Fcg.Payment.Domain.csproj" />
+    <ProjectReference Include="..\..\Fcg.Payment.Infrastructure\Fcg.Payment.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
