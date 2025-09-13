@@ -10,9 +10,6 @@ public class PaymentItemConfiguration : IEntityTypeConfiguration<PaymentItem>
     {
         builder.ToTable("PaymentItems");
         builder.HasKey(p => new { p.PaymentId, p.GameId });
-        builder
-            .HasOne(p => p.Payment!)
-            .WithMany(p => p.Items)
-            .HasForeignKey(p => p.PaymentId);
+        builder.Property(i => i.UnitPrice).HasPrecision(18, 2);
     }
 }

@@ -24,7 +24,6 @@ namespace Fcg.Payment.Application
             {
                 PaymentId = i.PaymentId,
                 GameId = i.GameId,
-                Quantity = i.Quantity,
                 UnitPrice = i.UnitPrice
             }).ToList();
         }
@@ -34,7 +33,6 @@ namespace Fcg.Payment.Application
     {
         public Guid PaymentId { get; set; }
         public string GameId { get; set; } = default!;
-        public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
     }
 

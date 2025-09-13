@@ -11,26 +11,30 @@ namespace Fcg.Payment.Infrastructure.Messaging;
 
 public class OutboxDispatcher : BackgroundService
 {
-    private readonly IServiceScopeFactory _sf;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IAmazonSQS _sqs;
     private readonly string _queueUrl;
 
-    public OutboxDispatcher(IServiceScopeFactory sf, IAmazonSQS sqs, IConfiguration cfg)
+    public OutboxDispatcher(IServiceScopeFactory serviceScopeFactory, IAmazonSQS sqs, IConfiguration cfg)
     {
-        _sf = sf; _sqs = sqs; _queueUrl = cfg["Sqs:PaymentConfirmedQueueUrl"] ?? "";
+        this._serviceScopeFactory = serviceScopeFactory;
+        this._sqs = sqs;
+        this._queueUrl = cfg["Sqs:PaymentConfirmedQueueUrl"] ?? "";
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (string.IsNullOrWhiteSpace(_queueUrl))
+        if (string.IsNullOrWhiteSpace(this._queueUrl))
+        {
             Console.WriteLine("Sqs:PaymentConfirmedQueueUrl not configured. OutboxPublisher sleeping.");
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (!string.IsNullOrWhiteSpace(_queueUrl))
+            if (!string.IsNullOrWhiteSpace(this._queueUrl))
             {
-                using var scope = _sf.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+                using IServiceScope scope = this._serviceScopeFactory.CreateScope();
+                PaymentDbContext db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
 
                 var batch = await db.Outbox
                     .Where(x => x.SentAt == null)
@@ -38,13 +42,13 @@ public class OutboxDispatcher : BackgroundService
                     .Take(20)
                     .ToListAsync(stoppingToken);
 
-                foreach (var msg in batch)
+                foreach (OutboxMessage msg in batch)
                 {
                     try
                     {
-                        var req = new SendMessageRequest
+                        SendMessageRequest req = new()
                         {
-                            QueueUrl = _queueUrl,
+                            QueueUrl = this._queueUrl,
                             MessageBody = msg.PayloadJson,
                             MessageAttributes = new()
                             {
@@ -52,16 +56,16 @@ public class OutboxDispatcher : BackgroundService
                             }
                         };
 
-                        if (IsFifoQueue(_queueUrl))
+                        if (IsFifoQueue(this._queueUrl))
                         {
-                            // Escolha de agrupamento: por compra (purchaseId) ou por usuário (userId).
-                            var (groupId, dedupId) = BuildFifoMetadata(msg);
+                            // Escolha de agrupamento, por compra (purchaseId) ou por usuário (userId).
+                            (string groupId, string dedupId) = BuildFifoMetadata(msg);
 
                             req.MessageGroupId = groupId;
                             req.MessageDeduplicationId = dedupId;
                         }
 
-                        await _sqs.SendMessageAsync(req, stoppingToken);
+                        await this._sqs.SendMessageAsync(req, stoppingToken);
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
@@ -79,22 +83,22 @@ public class OutboxDispatcher : BackgroundService
     }
 
     private static bool IsFifoQueue(string url) =>
-        url?.EndsWith(".fifo", StringComparison.OrdinalIgnoreCase) ?? false;
+        url.EndsWith(".fifo", StringComparison.OrdinalIgnoreCase);
 
     private static (string groupId, string dedupId) BuildFifoMetadata(OutboxMessage msg)
     {
         string groupId = "payments"; // fallback global
-        try
+        using JsonDocument doc = JsonDocument.Parse(msg.PayloadJson);
+        // Tente agrupar por compra
+        if (doc.RootElement.TryGetProperty("purchaseId", out JsonElement pId) && pId.ValueKind is JsonValueKind.String)
         {
-            using var doc = JsonDocument.Parse(msg.PayloadJson);
-            // Tente agrupar por compra (ordenação por compra)…
-            if (doc.RootElement.TryGetProperty("purchaseId", out var pId) && pId.ValueKind is JsonValueKind.String)
-                groupId = $"purchase-{pId.GetString()}";
-            // …ou por usuário (ordenação por usuário)
-            else if (doc.RootElement.TryGetProperty("userId", out var uId) && uId.ValueKind is JsonValueKind.String)
-                groupId = $"user-{uId.GetString()}";
+            groupId = $"purchase-{pId.GetString()}";
         }
-        catch { /* se não der pra parsear, usa fallback */ }
+        // Senão, por usuário
+        else if (doc.RootElement.TryGetProperty("userId", out JsonElement uId) && uId.ValueKind is JsonValueKind.String)
+        {
+            groupId = $"user-{uId.GetString()}";
+        }
 
         // Para dedupe, use o próprio Id do outbox (ou o purchaseId):
         string dedupId = msg.Id.ToString(); // se a fila tiver ContentBasedDedup=true, pode omitir

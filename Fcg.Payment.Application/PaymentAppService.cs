@@ -21,34 +21,46 @@ public class PaymentAppService : IPaymentAppService
         IPspClient psp,
         CancellationToken cancellationToken)
     {
-        // Idempotência de criação
+        // Idempotência da criação
         string? existing = await this._idemp.GetResponseAsync(idemKey, cancellationToken);
         if (existing is not null)
+        {
             return JsonSerializer.Deserialize<CreatePaymentResponse>(existing)!;
+        }
 
-        // Cria o pagamento (Pending)
-        Domain.Payment payment = new(
-            userId: req.UserId,
-            amount: req.Items.Sum(i => i.UnitPrice),
-            currency: req.Currency,
-            items: req.Items.Select(i => new PaymentItem
-            {
-                GameId = i.GameId,
-                UnitPrice = i.UnitPrice
-            }).ToList());
+        // Validacões simples de entrada
+        if (req is null)
+        {
+            throw new ArgumentNullException(nameof(req));
+        }
+
+        if (req.Items is null || !req.Items.Any())
+        {
+            throw new InvalidOperationException("Payment must have at least one item.");
+        }
+
+        // Cria o agregado em Pending e adiciona itens
+        Domain.Payment payment = Domain.Payment.Create(req.UserId, req.Currency);
+
+        foreach (CreatePaymentItem i in req.Items)
+        {
+            payment.AddItem(i.GameId, i.UnitPrice);
+        }
 
         await this._uow.PaymentRepository.AddAsync(payment, cancellationToken);
+        // Garante Id gerado/persistência antes do PSP
         await this._uow.CommitAsync(cancellationToken);
 
-        // Gera um checkoutUrl "fake" via PSP adapter atual
+        // Cria o checkout no PSP e vincula o PSP reference no domínio
         (string checkoutUrl, string pspRef) = await psp.CreateCheckoutAsync(payment, cancellationToken);
-        payment.PspReference = pspRef;
+
+        // Lança se vier nulo/branco ou conflitante
+        payment.BindPspReference(pspRef);
 
         await this._uow.CommitAsync(cancellationToken);
 
         // Resposta + registro da idempotência
         CreatePaymentResponse resp = new(payment.Id, checkoutUrl);
-
         await this._idemp.SaveResponseAsync(idemKey, JsonSerializer.Serialize(resp), cancellationToken);
 
         return resp;
@@ -57,13 +69,6 @@ public class PaymentAppService : IPaymentAppService
     public async Task<PaymentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         Domain.Payment? payment = await this._uow.PaymentRepository.GetByIdAsync(id, cancellationToken);
-
-        if (payment == null)
-        {
-            return null;
-        }
-
-
-        return new PaymentResponse(payment);
+        return payment is null ? null : new PaymentResponse(payment);
     }
 }

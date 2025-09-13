@@ -17,9 +17,9 @@ namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
 
         public HttpPspClientWireMock(HttpClient http, IOptions<PspOptions> opt)
         {
-            _http = http;
-            _opt = opt.Value;
-            _http.BaseAddress = new Uri(_opt.BaseUrl);
+            this._http = http;
+            this._opt = opt.Value;
+            this._http.BaseAddress = new Uri(this._opt.BaseUrl);
         }
 
         public async Task<(string checkoutUrl, string pspRef)> CreateCheckoutAsync(Domain.Payment payment, CancellationToken cancellationToken)
@@ -28,10 +28,10 @@ namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
             {
                 userId = payment.UserId,
                 currency = payment.Currency,
-                items = payment.Items.Select(i => new { gameId = i.GameId, quantity = i.Quantity, unitPrice = i.UnitPrice })
+                items = payment.Items.Select(i => new { gameId = i.GameId, unitPrice = i.UnitPrice })
             };
 
-            var resp = await _http.PostAsJsonAsync("/psp/checkout/sessions", payload, cancellationToken);
+            var resp = await this._http.PostAsJsonAsync("/psp/checkout/sessions", payload, cancellationToken);
             resp.EnsureSuccessStatusCode();
 
             var json = await resp.Content.ReadFromJsonAsync<ResponseDto>(cancellationToken: cancellationToken)
@@ -60,7 +60,7 @@ namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
 
         public (string, string, Domain.PaymentStatus) ParseWebhook(string payload)
         {
-            var (evt, status, refId) = Parse(payload);
+            var (evt, status, refId) = this.Parse(payload);
             return (evt, refId, status);
         }
 
