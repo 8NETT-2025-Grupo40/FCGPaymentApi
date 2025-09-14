@@ -1,4 +1,5 @@
 ﻿using Fcg.Payment.Domain;
+using Fcg.Payment.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 

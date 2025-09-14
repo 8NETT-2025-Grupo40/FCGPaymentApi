@@ -1,4 +1,7 @@
-namespace Fcg.Payment.Application;
+using Fcg.Payment.Application.Payments.Dtos;
+using Fcg.Payment.Application.Ports;
+
+namespace Fcg.Payment.Application.Payments;
 
 public interface IPaymentAppService
 {

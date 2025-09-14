@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Fcg.Payment.Application;
+using Fcg.Payment.Application.Payments.Dtos;
 using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;

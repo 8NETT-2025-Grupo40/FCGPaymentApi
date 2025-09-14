@@ -1,4 +1,5 @@
-using Fcg.Payment.Domain;
+using Fcg.Payment.Infrastructure.Messaging;
+using Fcg.Payment.Infrastructure.Stores;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fcg.Payment.Infrastructure;
@@ -9,7 +10,7 @@ public class PaymentDbContext : DbContext
 
     public PaymentDbContext(DbContextOptions<PaymentDbContext> options) : base(options) { }
 
-    public DbSet<Domain.Payment> Payments { get; set; }
+    public DbSet<Domain.Payments.Payment> Payments { get; set; }
     public DbSet<OutboxMessage> Outbox { get; set; }
     public DbSet<IdempotencyKey> Idempotency { get; set; }
 

@@ -1,6 +1,6 @@
 ﻿using Fcg.Payment.Domain.Common;
 
-namespace Fcg.Payment.Domain
+namespace Fcg.Payment.Domain.Payments
 {
     public interface IPaymentRepository : IRepository<Payment>
     {

@@ -1,10 +1,10 @@
-﻿using Fcg.Payment.Domain;
+﻿using Fcg.Payment.Domain.Payments;
 using Fcg.Payment.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace Fcg.Payment.Infrastructure.Repositories
 {
-    public class PaymentRepository : EFRepository<Domain.Payment>, IPaymentRepository
+    public class PaymentRepository : EFRepository<Domain.Payments.Payment>, IPaymentRepository
     {
         private readonly PaymentDbContext _paymentsDbContext;
 
@@ -13,7 +13,7 @@ namespace Fcg.Payment.Infrastructure.Repositories
             this._paymentsDbContext = paymentsDbContext;
         }
 
-        public Task<Domain.Payment?> GetByPspReferenceAsync(string pspRef, CancellationToken cancellationToken)
+        public Task<Domain.Payments.Payment?> GetByPspReferenceAsync(string pspRef, CancellationToken cancellationToken)
         {
             return this._paymentsDbContext.Payments
                 .Include(p => p.Items)

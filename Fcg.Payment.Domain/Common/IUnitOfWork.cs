@@ -1,4 +1,6 @@
-﻿namespace Fcg.Payment.Domain.Common;
+﻿using Fcg.Payment.Domain.Payments;
+
+namespace Fcg.Payment.Domain.Common;
 
 /// <summary>
 /// Coordenador de repositórios, garantindo que todas as operações realizadas durante uma transação sejam concluídas com sucesso antes de serem persistidas,

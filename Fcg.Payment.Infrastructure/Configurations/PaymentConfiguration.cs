@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace Fcg.Payment.Infrastructure.Configurations;
 
-public class PaymentConfiguration : IEntityTypeConfiguration<Domain.Payment>
+public class PaymentConfiguration : IEntityTypeConfiguration<Domain.Payments.Payment>
 {
-    public void Configure(EntityTypeBuilder<Domain.Payment> builder)
+    public void Configure(EntityTypeBuilder<Domain.Payments.Payment> builder)
     {
         builder.ToTable("Payments");
         builder.HasKey(x => x.Id);

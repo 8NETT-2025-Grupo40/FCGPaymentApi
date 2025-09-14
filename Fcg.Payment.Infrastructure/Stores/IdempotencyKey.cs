@@ -1,6 +1,6 @@
 using Fcg.Payment.Domain.Common;
 
-namespace Fcg.Payment.Domain;
+namespace Fcg.Payment.Infrastructure.Stores;
 
 public class IdempotencyKey : BaseEntity
 {

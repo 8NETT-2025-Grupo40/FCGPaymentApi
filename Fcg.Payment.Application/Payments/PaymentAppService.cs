@@ -1,8 +1,9 @@
 using System.Text.Json;
-using Fcg.Payment.Domain;
+using Fcg.Payment.Application.Payments.Dtos;
+using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain.Common;
 
-namespace Fcg.Payment.Application;
+namespace Fcg.Payment.Application.Payments;
 
 public class PaymentAppService : IPaymentAppService
 {
@@ -40,7 +41,7 @@ public class PaymentAppService : IPaymentAppService
         }
 
         // Cria o agregado em Pending e adiciona itens
-        Domain.Payment payment = Domain.Payment.Create(req.UserId, req.Currency);
+        Domain.Payments.Payment payment = Domain.Payments.Payment.Create(req.UserId, req.Currency);
 
         foreach (CreatePaymentItem i in req.Items)
         {
@@ -68,7 +69,7 @@ public class PaymentAppService : IPaymentAppService
 
     public async Task<PaymentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        Domain.Payment? payment = await this._uow.PaymentRepository.GetByIdAsync(id, cancellationToken);
+        Domain.Payments.Payment? payment = await this._uow.PaymentRepository.GetByIdAsync(id, cancellationToken);
         return payment is null ? null : new PaymentResponse(payment);
     }
 }

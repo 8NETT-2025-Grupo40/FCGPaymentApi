@@ -1,6 +1,6 @@
-﻿using Fcg.Payment.Domain;
+﻿using Fcg.Payment.Domain.Payments;
 
-namespace Fcg.Payment.Application
+namespace Fcg.Payment.Application.Payments.Dtos
 {
     public class PaymentResponse
     {
@@ -12,7 +12,7 @@ namespace Fcg.Payment.Application
         public string? PspReference { get; set; }
         public List<PaymentItemResponse> Items { get; set; }
 
-        public PaymentResponse(Domain.Payment payment)
+        public PaymentResponse(Domain.Payments.Payment payment)
         {
             this.PaymentId = payment.Id;
             this.UserId = payment.UserId;

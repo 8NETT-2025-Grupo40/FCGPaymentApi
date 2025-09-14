@@ -1,4 +1,4 @@
-namespace Fcg.Payment.Domain;
+namespace Fcg.Payment.Infrastructure.Messaging;
 
 public class OutboxMessage
 {

@@ -1,4 +1,5 @@
-﻿using Fcg.Payment.Application;
+﻿using Fcg.Payment.Application.Payments;
+using Fcg.Payment.Application.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.OpenApi.Models;

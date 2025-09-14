@@ -1,5 +1,6 @@
 ﻿using System.Net.Http.Json;
-using Fcg.Payment.Application;
+using Fcg.Payment.Application.Ports;
+using Fcg.Payment.Domain.Payments;
 using Microsoft.Extensions.Options;
 
 namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
@@ -22,7 +23,7 @@ namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
             this._http.BaseAddress = new Uri(this._opt.BaseUrl);
         }
 
-        public async Task<(string checkoutUrl, string pspRef)> CreateCheckoutAsync(Domain.Payment payment, CancellationToken cancellationToken)
+        public async Task<(string checkoutUrl, string pspRef)> CreateCheckoutAsync(Domain.Payments.Payment payment, CancellationToken cancellationToken)
         {
             var payload = new
             {
@@ -43,22 +44,22 @@ namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
         // WireMock não assina de fato — ok retornar true
         public bool TryValidateWebhookSignature(string payload, string signatureHeader) => true;
 
-        public (string eventType, Domain.PaymentStatus status, string pspReference) Parse(string payload)
+        public (string eventType, PaymentStatus status, string pspReference) Parse(string payload)
         {
             using var doc = System.Text.Json.JsonDocument.Parse(payload);
             var evt = doc.RootElement.GetProperty("eventType").GetString() ?? "unknown";
             var refId = doc.RootElement.GetProperty("pspReference").GetString() ?? "";
             var status = evt switch
             {
-                "payment_captured" => Domain.PaymentStatus.Captured,
-                "payment_failed" => Domain.PaymentStatus.Failed,
-                "payment_refunded" => Domain.PaymentStatus.Refunded,
-                _ => Domain.PaymentStatus.Pending
+                "payment_captured" => PaymentStatus.Captured,
+                "payment_failed" => PaymentStatus.Failed,
+                "payment_refunded" => PaymentStatus.Refunded,
+                _ => PaymentStatus.Pending
             };
             return (evt, status, refId);
         }
 
-        public (string, string, Domain.PaymentStatus) ParseWebhook(string payload)
+        public (string, string, PaymentStatus) ParseWebhook(string payload)
         {
             var (evt, status, refId) = this.Parse(payload);
             return (evt, refId, status);

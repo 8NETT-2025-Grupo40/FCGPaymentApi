@@ -1,4 +1,4 @@
-﻿namespace Fcg.Payment.Application
+﻿namespace Fcg.Payment.Application.Ports
 {
     public interface IIdempotencyStore
     {

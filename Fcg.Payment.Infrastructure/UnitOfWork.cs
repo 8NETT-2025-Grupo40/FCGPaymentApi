@@ -1,5 +1,5 @@
-﻿using Fcg.Payment.Domain;
-using Fcg.Payment.Domain.Common;
+﻿using Fcg.Payment.Domain.Common;
+using Fcg.Payment.Domain.Payments;
 
 namespace Fcg.Payment.Infrastructure;
 

@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Fcg.Payment.Application;
+using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain;
 
 namespace Fcg.Payment.Infrastructure.Messaging

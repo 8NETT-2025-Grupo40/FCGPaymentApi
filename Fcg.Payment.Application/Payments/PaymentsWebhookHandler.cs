@@ -1,6 +1,7 @@
-﻿using Fcg.Payment.Application;
+﻿using Fcg.Payment.Application.Payments;
+using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain.Common;
-using Fcg.Payment.Domain;
+using Fcg.Payment.Domain.Payments;
 
 public class PaymentsWebhookHandler : IPaymentsWebhookHandler
 {

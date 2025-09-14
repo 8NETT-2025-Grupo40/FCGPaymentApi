@@ -1,4 +1,4 @@
-namespace Fcg.Payment.Domain;
+namespace Fcg.Payment.Domain.Payments;
 
 public class PaymentItem
 {
@@ -6,8 +6,8 @@ public class PaymentItem
 
     public PaymentItem(string gameId, decimal unitPrice)
     {
-        GameId = gameId;
-        UnitPrice = unitPrice;
+        this.GameId = gameId;
+        this.UnitPrice = unitPrice;
     }
 
     public Guid PaymentId { get; private set; }

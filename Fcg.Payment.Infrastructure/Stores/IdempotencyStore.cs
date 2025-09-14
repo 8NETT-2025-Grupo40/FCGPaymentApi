@@ -1,4 +1,4 @@
-﻿using Fcg.Payment.Application;
+﻿using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain;
 using Microsoft.EntityFrameworkCore;
 
