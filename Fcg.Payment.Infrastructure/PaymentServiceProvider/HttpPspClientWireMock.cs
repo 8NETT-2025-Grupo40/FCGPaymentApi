@@ -1,26 +1,25 @@
 ﻿using System.Net.Http.Json;
 using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain.Payments;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
 {
-
-    public class PspOptions
-    {
-        public string BaseUrl { get; set; } = "http://localhost:8080"; // WireMock
-    }
-
     public class HttpPspClientWireMock : IPspClient
     {
         private readonly HttpClient _http;
-        private readonly PspOptions _opt;
 
-        public HttpPspClientWireMock(HttpClient http, IOptions<PspOptions> opt)
+        public HttpPspClientWireMock(HttpClient http, IConfiguration cfg)
         {
             this._http = http;
-            this._opt = opt.Value;
-            this._http.BaseAddress = new Uri(this._opt.BaseUrl);
+
+            string? wiremockUrl = cfg["Psp:WIREMOCK_URL"];
+            if (string.IsNullOrEmpty(wiremockUrl))
+            {
+                throw new InvalidOperationException("WIREMOCK_URL not provided");
+            }
+
+            this._http.BaseAddress = new Uri(wiremockUrl);
         }
 
         public async Task<(string checkoutUrl, string pspRef)> CreateCheckoutAsync(Domain.Payments.Payment payment, CancellationToken cancellationToken)

@@ -19,5 +19,12 @@ namespace Fcg.Payment.Infrastructure.Repositories
                 .Include(p => p.Items)
                 .FirstOrDefaultAsync(p => p.PspReference == pspRef, cancellationToken);
         }
+
+        public async Task<Domain.Payments.Payment?> GetByPaymentIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return await this._paymentsDbContext.Payments
+                .Include(p => p.Items)
+                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+        }
     }
 }

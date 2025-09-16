@@ -1,4 +1,5 @@
-﻿using Fcg.Payment.Application.Payments;
+﻿using Fcg.Payment.API.Middlewares;
+using Fcg.Payment.Application.Payments;
 using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain.Common;
 using Fcg.Payment.Domain.Payments;
@@ -25,5 +26,11 @@ public static class DependencyInjection
 
         // Common
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+    }
+
+    public static void RegisterMiddlewares(this IServiceCollection services)
+    {
+        services.AddTransient<StructuredLogMiddleware>();
+        services.AddTransient<GlobalErrorHandlingMiddleware>();
     }
 }

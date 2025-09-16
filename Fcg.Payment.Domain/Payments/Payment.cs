@@ -98,7 +98,7 @@ public class Payment : BaseEntity
 
         this.EnsurePspReference(pspReference);
         this.Status = PaymentStatus.Failed;
-        // opcional: armazenar reason
+
         return true;
     }
 

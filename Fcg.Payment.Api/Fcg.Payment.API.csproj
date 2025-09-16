@@ -21,8 +21,8 @@
     <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Fcg.Payment.Application\Fcg.Payment.Application.csproj" />
-    <ProjectReference Include="..\..\Fcg.Payment.Domain\Fcg.Payment.Domain.csproj" />
-    <ProjectReference Include="..\..\Fcg.Payment.Infrastructure\Fcg.Payment.Infrastructure.csproj" />
+    <ProjectReference Include="..\Fcg.Payment.Application\Fcg.Payment.Application.csproj" />
+    <ProjectReference Include="..\Fcg.Payment.Domain\Fcg.Payment.Domain.csproj" />
+    <ProjectReference Include="..\Fcg.Payment.Infrastructure\Fcg.Payment.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

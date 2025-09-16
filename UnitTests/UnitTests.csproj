@@ -18,11 +18,12 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Using Include="Xunit" />
+    <ProjectReference Include="..\Fcg.Payment.Api\Fcg.Payment.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Source\Payment.Api\Fcg.Payment.API.csproj" />
+    <Using Include="Xunit" />
   </ItemGroup>
+
 
 </Project>

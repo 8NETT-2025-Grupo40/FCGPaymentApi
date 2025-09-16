@@ -22,7 +22,6 @@ namespace Fcg.Payment.Application.Payments.Dtos
             this.PspReference = payment.PspReference;
             this.Items = payment.Items.Select(i => new PaymentItemResponse
             {
-                PaymentId = i.PaymentId,
                 GameId = i.GameId,
                 UnitPrice = i.UnitPrice
             }).ToList();
@@ -31,8 +30,7 @@ namespace Fcg.Payment.Application.Payments.Dtos
 
     public class PaymentItemResponse
     {
-        public Guid PaymentId { get; set; }
-        public string GameId { get; set; } = default!;
+        public string GameId { get; set; } = null!;
         public decimal UnitPrice { get; set; }
     }
 

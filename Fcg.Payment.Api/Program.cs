@@ -15,11 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Services
 builder.Services.RegisterServices();
+builder.Services.RegisterMiddlewares();
 // AWS Options + SQS client
 builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
 builder.Services.AddAWSService<IAmazonSQS>();
 
-builder.Services.Configure<PspOptions>(builder.Configuration.GetSection("Psp"));
 builder.Services.AddHttpClient<IPspClient, HttpPspClientWireMock>();
 
 builder.Services.AddSwaggerConfiguration();

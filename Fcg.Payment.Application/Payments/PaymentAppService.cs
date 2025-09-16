@@ -69,7 +69,7 @@ public class PaymentAppService : IPaymentAppService
 
     public async Task<PaymentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        Domain.Payments.Payment? payment = await this._uow.PaymentRepository.GetByIdAsync(id, cancellationToken);
+        Domain.Payments.Payment? payment = await this._uow.PaymentRepository.GetByPaymentIdAsync(id, cancellationToken);
         return payment is null ? null : new PaymentResponse(payment);
     }
 }
