@@ -1,0 +1,43 @@
+services:
+  # Mock do PSP para simular as respostas do provedor de pagamentos.
+  psp-wiremock:
+    image: wiremock/wiremock:latest
+    command:
+      # Deixa o log mais falante (bom pra entender o que está acontecendo)
+      - "--verbose"
+      # Habilita templating (ex.: {{now}}, {{randomValue}} nos JSONs)
+      - "--global-response-templating"
+      # Onde ficam mappings/__files dentro do container
+      - "--root-dir"
+      - "/home/wiremock"
+      # Porta interna do WireMock (a que a API vai usar)
+      - "--port"
+      - "8080"
+    volumes:
+      # Monta a pasta local ./wiremock dentro do container
+      # Assim você altera mappings/__files sem rebuildar imagem
+      - ./wiremock:/home/wiremock
+    # Só exponha se quiser acessar o WireMock pelo seu navegador/curl no host.
+    # Entre containers, a API fala com "psp-wiremock:8080" sem precisar disso.
+    ports:
+      - "8080:8080"
+
+  # API de Payments
+  fcg-payment-api:
+    image: fcg-payment-api:latest
+    depends_on:
+      - psp-wiremock
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_URLS: "http://+:5087"
+
+      # URL que a API vai usar para chamar o PSP (o host é o NOME do service Compose)
+      Psp__WIREMOCK_URL: "http://psp-wiremock:8080"
+
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal,1433;Database=FCG_Payment2;User Id=FCG;Password=123;TrustServerCertificate=True"
+    ports:
+      - "5087:5087"
+    # Em Linux, isto cria o alias "host.docker.internal" apontando pro host.
+    # No Docker Desktop (Windows/Mac), normalmente não precisa.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

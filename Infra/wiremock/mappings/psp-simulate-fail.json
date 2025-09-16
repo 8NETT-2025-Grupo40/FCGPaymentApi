@@ -1,0 +1,15 @@
+{
+  "request": { "method": "POST", "urlPathPattern": "/psp/simulate/fail/[^/]+" },
+  "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "ok": true } },
+  "serveEventListeners": [
+    {
+      "name": "webhook",
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5087/webhooks/psp",
+        "headers": { "X-PSP-Signature": "dev" },
+        "body": "{\"eventType\":\"payment_failed\",\"pspReference\":\"{{originalRequest.pathSegments.[3]}}\",\"status\":\"Failed\"}"
+      }
+    }
+  ]
+}
