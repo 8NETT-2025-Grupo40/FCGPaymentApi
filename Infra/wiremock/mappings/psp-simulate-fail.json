@@ -6,7 +6,7 @@
       "name": "webhook",
       "parameters": {
         "method": "POST",
-        "url": "http://host.docker.internal:5087/webhooks/psp",
+        "url": "http://host.docker.internal:5066/webhooks/psp",
         "headers": { "X-PSP-Signature": "dev" },
         "body": "{\"eventType\":\"payment_failed\",\"pspReference\":\"{{originalRequest.pathSegments.[3]}}\",\"status\":\"Failed\"}"
       }

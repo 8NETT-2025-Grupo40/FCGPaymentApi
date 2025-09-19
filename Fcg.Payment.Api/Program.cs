@@ -34,17 +34,17 @@ var app = builder.Build();
 
 // TODO: Apagar
 // Cria um escopo de serviço temporário para obter instâncias injetadas, como o DbContext.
-using var scope = app.Services.CreateScope();
+//using var scope = app.Services.CreateScope();
 
-// Recupera o ApplicationDbContext (ou qualquer DbContext que você esteja usando) a partir do container de injeção de dependência.
-var dbContext = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+//// Recupera o ApplicationDbContext (ou qualquer DbContext que você esteja usando) a partir do container de injeção de dependência.
+//var dbContext = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
 
-// Verifica se existem migrations pendentes (ainda não aplicadas ao banco de dados).
-if (dbContext.Database.GetPendingMigrations().Any())
-{
-    // Aplica todas as migrations pendentes automaticamente ao banco de dados.
-    dbContext.Database.Migrate();
-}
+//// Verifica se existem migrations pendentes (ainda não aplicadas ao banco de dados).
+//if (dbContext.Database.GetPendingMigrations().Any())
+//{
+//    // Aplica todas as migrations pendentes automaticamente ao banco de dados.
+//    dbContext.Database.Migrate();
+//}
 
 app.ConfigureMiddlewares();
 

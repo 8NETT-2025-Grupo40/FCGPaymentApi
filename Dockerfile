@@ -7,10 +7,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
 
-# Kestrel ouvindo em todas as interfaces na porta 5087
-ENV ASPNETCORE_URLS=http://+:5087
-# Documenta no Docker que o container expõe a porta 5087
-EXPOSE 5087
+# Kestrel ouvindo em todas as interfaces na porta 5066
+ENV ASPNETCORE_URLS=http://+:5066
+# Documenta no Docker que o container expõe a porta 5066
+EXPOSE 5066
 
 # ===============================
 # Stage 2: Build/Publish
