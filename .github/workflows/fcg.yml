@@ -1,0 +1,184 @@
+name: Fiap Cloud Games CI - Payment API
+
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+    types: [opened, synchronize]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: fcg-payment-api
+  ECS_SERVICE: FCG-TSK-PAYMENT-ECS-service-uudjbbgl
+  ECS_CLUSTER: FCG-Cluster
+  ECS_TASK_DEFINITION: .github/ecs/ecs-task-def.json
+  CONTAINER_NAME: fcg-payment-api
+
+jobs:
+  build:
+    name: Build the solution
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      - run: |
+          dotnet restore
+          dotnet build --no-restore --configuration Release
+          
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build Output
+          path: |
+            ./
+  tests:
+    name: Run unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Build Output
+          path: ./build_result
+        
+      - name: Unit Tests
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test ./build_result/Fcg.Payment.sln --logger trx --results-directory "Results"
+
+      - name: Upload test result
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test Results
+          path: "Results"
+        if: ${{ always() }}
+
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: .NET Tests Report
+          path: "**/*.trx"
+          reporter: dotnet-trx
+          fail-on-error: true
+
+  # TODO: Habilitar o ambiente quando estivermos prontos para deploy automático. Faz fake para facilitar testes
+  migration:
+    name: TEMP - Deploy DB (migrations)
+    needs: [build, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+  # TODO: Habilitar o ambiente quando estivermos prontos para deploy automático
+  # migration:
+  #   name: Deploy DB (migrations)
+  #   needs: [build, tests]
+  #   # TODO: Habilitar o ambiente quando estivermos prontos para deploy automático
+  #   # environment: production
+  #   # if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+  #   runs-on: 
+  #     - self-hosted
+  #     - linux
+  #     - X64
+  #   env:
+  #     # Declaramos aqui a variável vazia para o linter/intellisense do GitHub Actions
+  #     # entender que ela existe. O valor real é atribuído em tempo de execução
+  #     # pelo passo “Get RDS connection string” via $GITHUB_ENV.
+  #     RDS_CONNECTION_STRING: ''
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #     # - name: Configure AWS credentials
+  #     #   uses: aws-actions/configure-aws-credentials@v2
+  #     #   with:
+  #     #     aws-region: ${{ env.AWS_REGION }}
+  #     #     aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #     #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+  #     # - name: Get RDS connection string from Secrets Manager
+  #     #   id: get-rds-secret
+  #     #   run: |
+  #     #     SECRET_JSON=$(aws secretsmanager get-secret-value \
+  #     #       --secret-id fcg-api-connection-string \
+  #     #       --query SecretString \
+  #     #       --output text)
+  #     #     echo "RDS_CONNECTION_STRING=$SECRET_JSON" >> $GITHUB_ENV
+  #     #   env:
+  #     #     AWS_REGION: ${{ env.AWS_REGION }}
+          
+  #     # - name: Add global tools to PATH
+  #     #   run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+  #     # - name: Apply migrations
+  #     #   env:
+  #     #     ConnectionStrings__DefaultConnection: ${{ env.RDS_CONNECTION_STRING }}
+  #     #   run: |
+  #     #     dotnet ef database update \
+  #     #       --configuration Release \
+  #     #       --project FCG.API/FCG.API.csproj \
+  #     #       --connection "$ConnectionStrings__DefaultConnection"
+
+  deploy:
+    name: Publish docker image on ECR and deploy to ECS
+    needs: [build, tests, migration]
+    # TODO: Habilitar o ambiente quando estivermos prontos para deploy automático
+    # environment: production
+    # if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.build-image.outputs.IMAGE }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        with: 
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@62f4f872db3836360b72999f4b87f1ff13310f3a
+
+      - name: Build, tag and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      #  TODO: Habilitar quando for resolvido o assunto dos containers
+      # - name: Fill the image ID in the ECS task definition
+      #   id: task-def
+      #   uses: aws-actions/amazon-ecs-render-task-definition@c804dfbdd57f713b6c079302a4c01db7017a36fc
+      #   with:
+      #     task-definition: ${{ env.ECS_TASK_DEFINITION }}
+      #     container-name: ${{ env.CONTAINER_NAME }}
+      #     image: ${{ steps.build-image.outputs.image }}
+
+      # - name: Deploy ECS Task Definition
+      #   uses: aws-actions/amazon-ecs-deploy-task-definition@df9643053eda01f169e64a0e60233aacca83799a
+      #   with:
+      #     task-definition: ${{ steps.task-def.outputs.task-definition }}
+      #     service: ${{ env.ECS_SERVICE }}
+      #     cluster: ${{ env.ECS_CLUSTER }}
+      #     wait-for-service-stability: true
