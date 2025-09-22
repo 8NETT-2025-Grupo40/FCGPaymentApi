@@ -89,8 +89,6 @@ jobs:
     name: Build and Push WireMock image
     needs: [build, tests, migration]
     runs-on: ubuntu-latest
-    outputs:
-      image_uri: ${{ steps.build-image.outputs.image }}
     steps:
       - uses: actions/checkout@v4
 
@@ -102,94 +100,96 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@62f4f872db3836360b72999f4b87f1ff13310f3a
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag and push image to Amazon ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: latest
+      - name: Build, tag and push WireMock
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_WIREMOCK:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY_WIREMOCK:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_WIREMOCK:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          TAG="${GITHUB_SHA::7}"
+          IMAGE_URI="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
+
+          # Builda a partir do Dockerfile do WireMock
+          docker build -t wm:ci -f Infra/wiremock/Dockerfile Infra/wiremock
+
+          docker tag wm:ci "$IMAGE_URI"
+          docker push "$IMAGE_URI"
 
   api_image:
     name: Build and Push API Payment image
     needs: [build, tests, migration]
     runs-on: ubuntu-latest
-    outputs:
-      image_uri: ${{ steps.build-image.outputs.image }}
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
-        with: 
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@62f4f872db3836360b72999f4b87f1ff13310f3a
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag and push image to Amazon ECR
-        id: build-image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: latest
+      - name: Build, tag and push API
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG    
-          echo "API: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          TAG="${GITHUB_SHA::7}"
+          IMAGE_URI="$REG/${{ env.ECR_REPOSITORY }}:$TAG"
+
+          docker build -t api:ci .
+          docker tag api:ci "$IMAGE_URI"
+          docker push "$IMAGE_URI"
 
   deploy:
-    name: Publish docker image on ECR and deploy to ECS
+    name: Render 2 containers & deploy ECS
     needs: [wiremock_image, api_image]
-    # TODO: Habilitar o ambiente quando estivermos prontos para deploy automático
-    # environment: production
-    # if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@0e613a0980cbf65ed5b322eb7a1e075d28913a83
+        uses: aws-actions/configure-aws-credentials@v4
         with: 
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Show image URIs
+      - name: Compute image URIs (API & WireMock)
+        id: imgs
         run: |
-          echo "WM:  ${{ needs.wiremock_image.outputs.image_uri }}"
-          echo "API: ${{ needs.api_image.outputs.image_uri }}"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          TAG="${GITHUB_SHA::7}"
+
+          echo "WM=$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
+          echo "API=$REG/${{ env.ECR_REPOSITORY }}:$TAG"
+
+          echo "WM_IMAGE=$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG" >> $GITHUB_OUTPUT
+          echo "API_IMAGE=$REG/${{ env.ECR_REPOSITORY }}:$TAG"         >> $GITHUB_OUTPUT
 
       - name: Render taskdef (WireMock)
         id: render-wm
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION }}
-          container-name: ${{ env.CONTAINER_NAME_WIREMOCK }}
-          image: ${{ needs.wiremock_image.outputs.image_uri }}
-          
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}      # JSON com os DOIS containers
+          container-name: ${{ env.CONTAINER_NAME_WIREMOCK }}   # ex.: psp-wiremock (confira o nome no JSON)
+          image: ${{ steps.imgs.outputs.WM_IMAGE }}
+
       - name: Render taskdef (API)
         id: render-api
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ${{ steps.render-wm.outputs.task-definition }}
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ needs.api_image.outputs.image_uri }}
-          
+          container-name: ${{ env.CONTAINER_NAME }}            # ex.: fcg-payment-api (confira o nome no JSON)
+          image: ${{ steps.imgs.outputs.API_IMAGE }}
+
       - name: Deploy ECS Task Definition
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.render-api.outputs.task-definition }}
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
-          # TODO: wait-for-service-stability: true
+          wait-for-service-stability: true
