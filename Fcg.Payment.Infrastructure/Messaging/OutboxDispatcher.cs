@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace Fcg.Payment.Infrastructure.Messaging;
 
@@ -13,34 +14,43 @@ public class OutboxDispatcher : BackgroundService
 {
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IAmazonSQS _sqs;
+    private readonly ILogger<OutboxDispatcher> _logger;
     private readonly string _queueUrl;
 
-    public OutboxDispatcher(IServiceScopeFactory serviceScopeFactory, IAmazonSQS sqs, IConfiguration cfg)
+    public OutboxDispatcher(IServiceScopeFactory serviceScopeFactory, IAmazonSQS sqs, IConfiguration cfg, ILogger<OutboxDispatcher> logger)
     {
         this._serviceScopeFactory = serviceScopeFactory;
         this._sqs = sqs;
+        this._logger = logger;
         this._queueUrl = cfg["Sqs:PaymentConfirmedQueueUrl"] ?? "";
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(this._queueUrl))
         {
-            Console.WriteLine("Sqs:PaymentConfirmedQueueUrl not configured. OutboxPublisher sleeping.");
+            this._logger.LogInformation("Sqs:PaymentConfirmedQueueUrl not configured. OutboxPublisher sleeping.");
         }
 
-        while (!stoppingToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested)
         {
             if (!string.IsNullOrWhiteSpace(this._queueUrl))
             {
                 using IServiceScope scope = this._serviceScopeFactory.CreateScope();
                 PaymentDbContext db = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
 
+                // Caso n√£o seja poss√≠vel connectar no banco de dados, protege contra falhas em cascata.
+                if (!await db.Database.CanConnectAsync(cancellationToken))
+                {
+                    this._logger.LogInformation("Cannot connect to database.");
+                    continue;
+                }
+
                 var batch = await db.Outbox
                     .Where(x => x.SentAt == null)
                     .OrderBy(x => x.OccurredAt)
                     .Take(20)
-                    .ToListAsync(stoppingToken);
+                    .ToListAsync(cancellationToken);
 
                 foreach (OutboxMessage msg in batch)
                 {
@@ -58,27 +68,27 @@ public class OutboxDispatcher : BackgroundService
 
                         if (IsFifoQueue(this._queueUrl))
                         {
-                            // Escolha de agrupamento, por compra (purchaseId) ou por usu·rio (userId).
+                            // Escolha de agrupamento, por compra (purchaseId) ou por usu√°rio (userId).
                             (string groupId, string dedupId) = BuildFifoMetadata(msg);
 
                             req.MessageGroupId = groupId;
                             req.MessageDeduplicationId = dedupId;
                         }
 
-                        await this._sqs.SendMessageAsync(req, stoppingToken);
+                        await this._sqs.SendMessageAsync(req, cancellationToken);
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
                     {
                         msg.Attempts++;
-                        Console.WriteLine($"Outbox publish fail: {ex.Message}");
+                        this._logger.LogInformation($"Outbox publish fail: {ex.Message}");
                     }
                 }
 
-                await db.SaveChangesAsync(stoppingToken);
+                await db.SaveChangesAsync(cancellationToken);
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(3), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
         }
     }
 
@@ -94,14 +104,14 @@ public class OutboxDispatcher : BackgroundService
         {
             groupId = $"purchase-{pId.GetString()}";
         }
-        // Sen„o, por usu·rio
+        // Sen√£o, por usu√°rio
         else if (doc.RootElement.TryGetProperty("userId", out JsonElement uId) && uId.ValueKind is JsonValueKind.String)
         {
             groupId = $"user-{uId.GetString()}";
         }
 
-        // Para dedupe, use o prÛprio Id do outbox (ou o purchaseId):
-        string dedupId = msg.Id.ToString(); // se a fila tiver ContentBasedDedup=true, pode omitir
+        // Para dedupe, use o pr√≥prio Id do outbox (ou o purchaseId):
+        string dedupId = msg.Id.ToString();
         return (groupId, dedupId);
     }
 }
