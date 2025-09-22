@@ -1,3 +1,69 @@
 {
-    "aaaaa":"TEMP"
+    "family": "FCG-TSK-PAYMENT-ECS",
+    "containerDefinitions": [
+        {
+            "cpu": 0,
+            "environment": [],
+            "environmentFiles": [],
+            "essential": true,
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:latest",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/FCG-TSK-PAYMENT-ECS",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "mountPoints": [],
+            "name": "fcg-payment-api",
+            "portMappings": [
+                {
+                    "appProtocol": "http",
+                    "containerPort": 5066,
+                    "hostPort": 5066,
+                    "name": "fcg-payment-api-5066-tcp",
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "ulimits": [],
+            "volumesFrom": []
+        },
+        {
+            "cpu": 0,
+            "environment": [],
+            "environmentFiles": [],
+            "essential": true,
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock@sha256:f72077d12fef6afec55fcabfad5e7e92a0e0c8ec9b993e6231d46a3c9af94f2f",
+            "mountPoints": [],
+            "name": "fcg-psp-wiremock",
+            "portMappings": [
+                {
+                    "containerPort": 5166,
+                    "hostPort": 5166,
+                    "name": "fcg-psp-wiremock-5166",
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": []
+        }
+    ],
+    "taskRoleArn": "arn:aws:iam::478511033947:role/ecsTaskExecutionRole",
+    "executionRoleArn": "arn:aws:iam::478511033947:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "2048",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    }
 }
