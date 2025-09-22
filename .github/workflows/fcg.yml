@@ -48,33 +48,33 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
-      # - name: Download build artifacts
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: Build Output
-      #     path: ./build_result
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Build Output
+          path: ./build_result
         
-      # - name: Unit Tests
-      #   uses: actions/setup-dotnet@v3
-      #   with:
-      #     dotnet-version: 8.0.x
-      # - run: dotnet test ./build_result/Fcg.Payment.sln --logger trx --results-directory "Results"
+      - name: Unit Tests
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test ./build_result/Fcg.Payment.sln --logger trx --results-directory "Results"
 
-      # - name: Upload test result
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: Test Results
-      #     path: "Results"
-      #   if: ${{ always() }}
+      - name: Upload test result
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test Results
+          path: "Results"
+        if: ${{ always() }}
 
-      # - name: Test Report
-      #   uses: dorny/test-reporter@v2
-      #   if: always()
-      #   with:
-      #     name: .NET Tests Report
-      #     path: "**/*.trx"
-      #     reporter: dotnet-trx
-      #     fail-on-error: true
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: .NET Tests Report
+          path: "**/*.trx"
+          reporter: dotnet-trx
+          fail-on-error: true
 
   # TODO: Habilitar o ambiente quando estivermos prontos para deploy automático. Faz fake para facilitar testes
   migration:
