@@ -107,13 +107,15 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
           TAG="${GITHUB_SHA::7}"
-          IMAGE_URI="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
+          IMG_SHA="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
+          IMG_LATEST="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:latest"
 
-          # Builda a partir do Dockerfile do WireMock
           docker build -t wm:ci -f Infra/wiremock/Dockerfile Infra/wiremock
+          docker tag wm:ci "$IMG_SHA"
+          docker tag wm:ci "$IMG_LATEST"
 
-          docker tag wm:ci "$IMAGE_URI"
-          docker push "$IMAGE_URI"
+          docker push "$IMG_SHA"
+          docker push "$IMG_LATEST"
 
   api_image:
     name: Build and Push API Payment image
@@ -137,11 +139,15 @@ jobs:
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
           TAG="${GITHUB_SHA::7}"
-          IMAGE_URI="$REG/${{ env.ECR_REPOSITORY }}:$TAG"
+          IMG_SHA="$REG/${{ env.ECR_REPOSITORY }}:$TAG"
+          IMG_LATEST="$REG/${{ env.ECR_REPOSITORY }}:latest"
 
           docker build -t api:ci .
-          docker tag api:ci "$IMAGE_URI"
-          docker push "$IMAGE_URI"
+          docker tag api:ci "$IMG_SHA"
+          docker tag api:ci "$IMG_LATEST"
+
+          docker push "$IMG_SHA"
+          docker push "$IMG_LATEST"
 
   deploy:
     name: Render 2 containers & deploy ECS
@@ -174,8 +180,8 @@ jobs:
         id: render-wm
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION }}      # JSON com os DOIS containers
-          container-name: ${{ env.CONTAINER_NAME_WIREMOCK }}   # ex.: psp-wiremock (confira o nome no JSON)
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME_WIREMOCK }}
           image: ${{ steps.imgs.outputs.WM_IMAGE }}
 
       - name: Render taskdef (API)
@@ -183,7 +189,7 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: ${{ steps.render-wm.outputs.task-definition }}
-          container-name: ${{ env.CONTAINER_NAME }}            # ex.: fcg-payment-api (confira o nome no JSON)
+          container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.imgs.outputs.API_IMAGE }}
 
       - name: Deploy ECS Task Definition
