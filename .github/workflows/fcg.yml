@@ -86,7 +86,7 @@ jobs:
         uses: actions/checkout@v4
 
   wiremock_image:
-    name: Build & Push WireMock image
+    name: Build and Push WireMock image
     needs: [build, tests, migration]
     runs-on: ubuntu-latest
     outputs:
@@ -144,7 +144,7 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   deploy:
     name: Publish docker image on ECR and deploy to ECS
@@ -178,7 +178,7 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Show image URIs
         run: |
