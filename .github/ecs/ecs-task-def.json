@@ -4,9 +4,8 @@
         {
             "cpu": 0,
             "environment": [],
-            "environmentFiles": [],
             "essential": true,
-            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:latest",
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:728ed52",
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -28,16 +27,20 @@
                     "protocol": "tcp"
                 }
             ],
+            "secrets": [
+                {
+                    "name": "ConnectionStrings__DefaultConnection",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:478511033947:secret:fcg-api-payment-connection-string-NoWx9k"
+                }
+            ],
             "systemControls": [],
-            "ulimits": [],
             "volumesFrom": []
         },
         {
             "cpu": 0,
             "environment": [],
-            "environmentFiles": [],
             "essential": true,
-            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock@sha256:f72077d12fef6afec55fcabfad5e7e92a0e0c8ec9b993e6231d46a3c9af94f2f",
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock:728ed52",
             "mountPoints": [],
             "name": "fcg-psp-wiremock",
             "portMappings": [
