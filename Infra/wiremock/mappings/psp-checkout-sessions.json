@@ -4,6 +4,6 @@
     "status": 201,
     "headers": { "Content-Type": "application/json" },
     "transformers": ["response-template"],
-"body": "{{#assign 'rid'}}{{randomValue type='UUID'}}{{/assign}}{ \"sessionId\": \"{{rid}}\", \"pspReference\": \"{{rid}}\", \"checkoutUrl\": \"http://localhost:5166/psp/checkout/{{rid}}\" }"
+"body": "{{#assign 'rid'}}{{randomValue type='UUID'}}{{/assign}}{{#assign 'scheme'}}{{#if request.headers.X-Forwarded-Proto}}{{request.headers.X-Forwarded-Proto}}{{else}}http{{/if}}{{/assign}}{{#assign 'host'}}{{#if request.headers.Host}}{{request.headers.Host}}{{else}}localhost:5166{{/if}}{{/assign}}{ \"sessionId\": \"{{rid}}\", \"pspReference\": \"{{rid}}\", \"checkoutUrl\": \"{{scheme}}://{{host}}/psp/checkout/{{rid}}\" }"
   }
 }
