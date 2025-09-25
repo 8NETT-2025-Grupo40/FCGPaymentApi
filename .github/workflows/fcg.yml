@@ -142,6 +142,12 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
       - name: Build, tag and push WireMock
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)

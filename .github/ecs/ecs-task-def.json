@@ -5,7 +5,7 @@
             "cpu": 0,
             "environment": [],
             "essential": true,
-            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:728ed52",
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:873e35d",
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -40,7 +40,7 @@
             "cpu": 0,
             "environment": [],
             "essential": true,
-            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock:728ed52",
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock:873e35d",
             "mountPoints": [],
             "name": "fcg-psp-wiremock",
             "portMappings": [
@@ -51,6 +51,31 @@
                     "protocol": "tcp"
                 }
             ],
+            "systemControls": [],
+            "volumesFrom": []
+        },
+        {
+            "command": [
+                "--config=/etc/ecs/ecs-xray.yaml"
+            ],
+            "cpu": 0,
+            "environment": [],
+            "essential": true,
+            "image": "public.ecr.aws/aws-observability/aws-otel-collector:v0.45.0",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/ecs-aws-otel-sidecar-collector",
+                    "mode": "non-blocking",
+                    "awslogs-create-group": "true",
+                    "max-buffer-size": "25m",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            },
+            "mountPoints": [],
+            "name": "aws-otel-collector",
+            "portMappings": [],
             "systemControls": [],
             "volumesFrom": []
         }

@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Amazon.SQS;
 using Fcg.Payment.API.Endpoints;
 using Fcg.Payment.Infrastructure;
@@ -29,6 +28,7 @@ builder.Services
     .AddCheck<DbContextHealthCheck<PaymentDbContext>>("DbContext_Check");
 
 builder.ConfigureSerilog();
+builder.Services.SetupOpenTelemetry();
 
 var app = builder.Build();
 
