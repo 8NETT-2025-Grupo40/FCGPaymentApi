@@ -5,7 +5,7 @@
             "cpu": 0,
             "environment": [],
             "essential": true,
-            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:873e35d",
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:c527c6f",
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
@@ -31,6 +31,10 @@
                 {
                     "name": "ConnectionStrings__DefaultConnection",
                     "valueFrom": "arn:aws:secretsmanager:us-east-1:478511033947:secret:fcg-api-payment-connection-string-NoWx9k"
+                },
+                {
+                    "name": "Sqs__PaymentConfirmedQueueUrl",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:478511033947:secret:sqs-payment-19T6cE"
                 }
             ],
             "systemControls": [],
@@ -40,7 +44,7 @@
             "cpu": 0,
             "environment": [],
             "essential": true,
-            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock:873e35d",
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock:c527c6f",
             "mountPoints": [],
             "name": "fcg-psp-wiremock",
             "portMappings": [
@@ -71,7 +75,8 @@
                     "max-buffer-size": "25m",
                     "awslogs-region": "us-east-1",
                     "awslogs-stream-prefix": "ecs"
-                }
+                },
+                "secretOptions": []
             },
             "mountPoints": [],
             "name": "aws-otel-collector",
