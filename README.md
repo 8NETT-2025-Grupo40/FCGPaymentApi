@@ -15,21 +15,6 @@ Ele se integra ao “PSP” (provedor de pagamentos simulado) e dispara o evento
 * **Publicação assíncrona** do evento `payment.confirmed` para **AWS SQS (FIFO)**.
 * **Consumidor serverless (AWS Lambda)** (https://github.com/8NETT-2025-Grupo40/FCGPaymentConfirmedConsumer) reage ao SQS e chama a Games API para liberação do jogo (idempotente e rastreável com cabeçalhos).
 
-```mermaid
-flowchart LR
-  Client[(Client / Frontend)]
-  Client -->|POST /payments (Idempotency-Key)| API[Payment API]
-  API -->|PSP checkout/capture| PSP[(PSP simulado)]
-  API -->|EF Core Tx| DB[(PaymentDb)]
-  API -->|write| Outbox[(Outbox)]
-  API -->|publish| SQS[(AWS SQS FIFO)]
-  Lambda[[Lambda payment-confirmed consumer]]
-  Lambda -->|consume| SQS
-  Lambda -->|POST /grants (Games API)| Games[(Games API)]
-```
-
-> Obs.: a **Lambda** e a **Games API** estão em outros repositórios (respectivamente https://github.com/8NETT-2025-Grupo40/FCGPaymentConfirmedConsumer e https://github.com/8NETT-2025-Grupo40/FcgGameApi)
-
 ---
 
 ## Fluxo de pagamento
