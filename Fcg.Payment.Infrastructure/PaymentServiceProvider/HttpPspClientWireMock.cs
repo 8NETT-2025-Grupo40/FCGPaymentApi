@@ -40,8 +40,9 @@ namespace Fcg.Payment.Infrastructure.PaymentServiceProvider
             return (json.checkoutUrl!, json.pspReference!);
         }
 
-        // WireMock não assina de fato — ok retornar true
-        public bool TryValidateWebhookSignature(string payload, string signatureHeader) => true;
+        public bool TryValidateWebhookSignature(string payload, string signatureHeader)
+            //  WireMock não assina, retorna true direto
+            => true;
 
         public (string eventType, PaymentStatus status, string pspReference) Parse(string payload)
         {

@@ -4,10 +4,8 @@ using Fcg.Payment.API.Models.Enums;
 
 namespace Fcg.Payment.API.Models;
 
-public class ApiStructuredLog(string endpoint)
+public class ApiStructuredLog()
 {
-    public string Endpoint { get; set; } = endpoint;
-
     [JsonIgnore] public DateTime RequestStart { get; } = DateTime.Now;
 
     [JsonIgnore]

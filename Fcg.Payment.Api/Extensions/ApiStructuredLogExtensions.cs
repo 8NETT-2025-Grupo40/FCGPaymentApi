@@ -27,9 +27,9 @@ public static class ApiStructuredLogExtensions
     public static void FinishRequest(this ApiStructuredLog apiStructuredLog)
     {
         const string iso8601Format = "yyyy-MM-dd HH:mm:ss.fff";
-        
+
         var datetimeNow = DateTime.Now;
-        
+
         apiStructuredLog.RequestStartTime = apiStructuredLog.RequestStart.ToString(iso8601Format);
         apiStructuredLog.RequestEndTime = datetimeNow.ToString(iso8601Format);
         var time = datetimeNow - apiStructuredLog.RequestStart;

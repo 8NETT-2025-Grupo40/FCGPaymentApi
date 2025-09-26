@@ -80,7 +80,7 @@ public class OutboxDispatcher : BackgroundService
                     catch (Exception ex)
                     {
                         msg.Attempts++;
-                        this._logger.LogInformation($"Outbox publish fail: {ex.Message}");
+                        this._logger.LogError($"Outbox publish fail: {ex.Message}");
                     }
                 }
 

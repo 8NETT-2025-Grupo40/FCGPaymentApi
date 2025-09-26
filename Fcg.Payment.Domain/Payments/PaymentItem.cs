@@ -11,7 +11,7 @@ public class PaymentItem
     }
 
     public Guid PaymentId { get; private set; }
-    public string GameId { get; private set; } = default!;
+    public string GameId { get; private set; } = null!;
     public decimal UnitPrice { get; private set; }
     public decimal Total => this.UnitPrice;
 

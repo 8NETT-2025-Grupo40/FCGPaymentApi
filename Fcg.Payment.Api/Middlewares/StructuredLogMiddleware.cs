@@ -16,7 +16,7 @@ public class StructuredLogMiddleware(ILogger<StructuredLogMiddleware> logger) : 
             using var memoryStreamResponseBody = new MemoryStream();
             context.Response.Body = memoryStreamResponseBody;
 
-            var log = new ApiStructuredLog(context.Request.Path);
+            var log = new ApiStructuredLog();
             await next(context);
             log.FinishRequest();
 
