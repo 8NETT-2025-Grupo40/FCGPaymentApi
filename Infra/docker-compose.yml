@@ -13,7 +13,7 @@ services:
     depends_on:
       - psp-wiremock
     environment:
-      ASPNETCORE_ENVIRONMENT: "Production"
+      ASPNETCORE_ENVIRONMENT: "Development"
       ASPNETCORE_URLS: "http://+:5066"
 
       # URL que a API vai usar para chamar o PSP (o host é o NOME do service Compose)
