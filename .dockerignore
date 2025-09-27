@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/.vs/
+**/*.user
+**/*.suo
+**/*.vscode/
+*.swp
+*.DS_Store
+*.git
+*.gitignore
+*.env

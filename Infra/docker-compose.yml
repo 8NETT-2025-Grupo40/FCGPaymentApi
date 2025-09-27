@@ -1,0 +1,28 @@
+services:
+  # Mock do PSP para simular as respostas do provedor de pagamentos.
+  psp-wiremock:
+    build:
+      context: ./wiremock
+      dockerfile: Dockerfile
+    ports:
+      - "5166:5166"
+
+  # API de Payments
+  fcg-payment-api:
+    image: fcg-payment-api:latest
+    depends_on:
+      - psp-wiremock
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:5066"
+
+      # URL que a API vai usar para chamar o PSP (o host é o NOME do service Compose)
+      Psp__WIREMOCK_URL: "http://psp-wiremock:5166"
+
+      ConnectionStrings__DefaultConnection: "Server=host.docker.internal,1433;Database=FCG_Payment2;User Id=FCG;Password=123;TrustServerCertificate=True"
+    ports:
+      - "5066:5066"
+    # Em Linux, isto cria o alias "host.docker.internal" apontando pro host.
+    # No Docker Desktop (Windows/Mac), normalmente não precisa.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

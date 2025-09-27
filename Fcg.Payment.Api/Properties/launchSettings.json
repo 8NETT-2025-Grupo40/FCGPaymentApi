@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Payment.Api": {
+        "commandName": "Project",
+        "dotnetRunMessages": true,
+        "launchUrl": "",
+        "launchBrowser": true,
+        "applicationUrl": "http://localhost:5066",
+        "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

@@ -1,0 +1,246 @@
+name: Fiap Cloud Games CI - Payment API
+
+on:
+  push:
+    branches: [ 'main' ]
+  pull_request:
+    types: [opened, synchronize]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: fcg-payment-api
+  ECR_REPOSITORY_WIREMOCK: fcg-psp-wiremock
+  ECS_SERVICE: FCG-TSK-PAYMENT-ECS-service-uudjbbgl
+  ECS_CLUSTER: FCG-Cluster
+  ECS_TASK_DEFINITION: .github/ecs/ecs-task-def.json
+  CONTAINER_NAME: fcg-payment-api
+  CONTAINER_NAME_WIREMOCK: fcg-psp-wiremock
+
+jobs:
+  build:
+    name: Build the solution
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      - run: |
+          dotnet restore
+          dotnet build --no-restore --configuration Release
+          
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build Output
+          path: |
+            ./
+  tests:
+    name: Run unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Build Output
+          path: ./build_result
+        
+      - name: Unit Tests
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet test ./build_result/Fcg.Payment.sln --logger trx --results-directory "Results"
+
+      - name: Upload test result
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test Results
+          path: "Results"
+        if: ${{ always() }}
+
+      - name: Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        with:
+          name: .NET Tests Report
+          path: "**/*.trx"
+          reporter: dotnet-trx
+          fail-on-error: true
+
+  migration:
+    name: Deploy DB (migrations)
+    needs: [build, tests]
+    environment: production
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: 
+      - self-hosted
+      - linux
+      - X64
+    env:
+      # Declaramos aqui a variável vazia para o linter/intellisense do GitHub Actions
+      # entender que ela existe. O valor real é atribuído em tempo de execução
+      # pelo passo “Get RDS connection string” via $GITHUB_ENV.
+      RDS_CONNECTION_STRING: ''
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Get RDS connection string from Secrets Manager
+        id: get-rds-secret
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id fcg-api-payment-connection-string \
+            --query SecretString \
+            --output text)
+          echo "RDS_CONNECTION_STRING=$SECRET_JSON" >> $GITHUB_ENV
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          
+      - name: Add global tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+        
+      - name: Apply migrations
+        env:
+          ConnectionStrings__DefaultConnection: ${{ env.RDS_CONNECTION_STRING }}
+        run: |
+          dotnet ef database update \
+            --configuration Release \
+            --project Fcg.Payment.Api/Fcg.Payment.API.csproj \
+            --connection "$ConnectionStrings__DefaultConnection"
+
+  wiremock_image:
+    name: Build and Push WireMock image
+    needs: [build, tests, migration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
+      - name: Build, tag and push WireMock
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          TAG="${GITHUB_SHA::7}"
+          IMG_SHA="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
+          IMG_LATEST="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:latest"
+
+          docker build -t wm:ci -f Infra/wiremock/Dockerfile Infra/wiremock
+          docker tag wm:ci "$IMG_SHA"
+          docker tag wm:ci "$IMG_LATEST"
+
+          docker push "$IMG_SHA"
+          docker push "$IMG_LATEST"
+
+  api_image:
+    name: Build and Push API Payment image
+    needs: [build, tests, migration]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push API
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          TAG="${GITHUB_SHA::7}"
+          IMG_SHA="$REG/${{ env.ECR_REPOSITORY }}:$TAG"
+          IMG_LATEST="$REG/${{ env.ECR_REPOSITORY }}:latest"
+
+          docker build -t api:ci .
+          docker tag api:ci "$IMG_SHA"
+          docker tag api:ci "$IMG_LATEST"
+
+          docker push "$IMG_SHA"
+          docker push "$IMG_LATEST"
+
+  deploy:
+    name: Render 2 containers & deploy ECS
+    needs: [wiremock_image, api_image]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with: 
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Compute image URIs (API & WireMock)
+        id: imgs
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+          TAG="${GITHUB_SHA::7}"
+
+          echo "WM=$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
+          echo "API=$REG/${{ env.ECR_REPOSITORY }}:$TAG"
+
+          echo "WM_IMAGE=$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG" >> $GITHUB_OUTPUT
+          echo "API_IMAGE=$REG/${{ env.ECR_REPOSITORY }}:$TAG"         >> $GITHUB_OUTPUT
+
+      - name: Render taskdef (WireMock)
+        id: render-wm
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME_WIREMOCK }}
+          image: ${{ steps.imgs.outputs.WM_IMAGE }}
+
+      - name: Render taskdef (API)
+        id: render-api
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-wm.outputs.task-definition }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.imgs.outputs.API_IMAGE }}
+
+      - name: Deploy ECS Task Definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render-api.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

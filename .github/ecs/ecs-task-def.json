@@ -1,0 +1,102 @@
+{
+    "family": "FCG-TSK-PAYMENT-ECS",
+    "containerDefinitions": [
+        {
+            "cpu": 0,
+            "environment": [],
+            "essential": true,
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api:44a89ff",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/FCG-TSK-PAYMENT-ECS",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "mountPoints": [],
+            "name": "fcg-payment-api",
+            "portMappings": [
+                {
+                    "appProtocol": "http",
+                    "containerPort": 5066,
+                    "hostPort": 5066,
+                    "name": "fcg-payment-api-5066-tcp",
+                    "protocol": "tcp"
+                }
+            ],
+            "secrets": [
+                {
+                    "name": "ConnectionStrings__DefaultConnection",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:478511033947:secret:fcg-api-payment-connection-string-NoWx9k"
+                },
+                {
+                    "name": "Sqs__PaymentConfirmedQueueUrl",
+                    "valueFrom": "arn:aws:secretsmanager:us-east-1:478511033947:secret:sqs-payment-19T6cE"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": []
+        },
+        {
+            "cpu": 0,
+            "environment": [],
+            "essential": true,
+            "image": "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock:44a89ff",
+            "mountPoints": [],
+            "name": "fcg-psp-wiremock",
+            "portMappings": [
+                {
+                    "containerPort": 5166,
+                    "hostPort": 5166,
+                    "name": "fcg-psp-wiremock-5166",
+                    "protocol": "tcp"
+                }
+            ],
+            "systemControls": [],
+            "volumesFrom": []
+        },
+        {
+            "command": [
+                "--config=/etc/ecs/ecs-xray.yaml"
+            ],
+            "cpu": 0,
+            "environment": [],
+            "essential": true,
+            "image": "public.ecr.aws/aws-observability/aws-otel-collector:v0.45.0",
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/ecs-aws-otel-sidecar-collector",
+                    "mode": "non-blocking",
+                    "awslogs-create-group": "true",
+                    "max-buffer-size": "25m",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "mountPoints": [],
+            "name": "aws-otel-collector",
+            "portMappings": [],
+            "systemControls": [],
+            "volumesFrom": []
+        }
+    ],
+    "taskRoleArn": "arn:aws:iam::478511033947:role/FCGTaskRole",
+    "executionRoleArn": "arn:aws:iam::478511033947:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "2048",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    }
+}

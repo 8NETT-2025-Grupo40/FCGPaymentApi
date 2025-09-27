@@ -1,0 +1,15 @@
+{
+  "request": { "method": "POST", "urlPathPattern": "/psp/simulate/capture/[^/]+" },
+  "response": { "status": 200, "headers": { "Content-Type": "application/json" }, "jsonBody": { "ok": true } },
+  "serveEventListeners": [
+    {
+      "name": "webhook",
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:5066/webhooks/psp",
+        "headers": { "X-PSP-Signature": "dev" },
+        "body": "{\"eventType\":\"payment_captured\",\"pspReference\":\"{{originalRequest.pathSegments.[3]}}\",\"status\":\"Captured\"}"
+      }
+    }
+  ]
+}
