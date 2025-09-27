@@ -201,7 +201,6 @@ Update-Database {MigrationName} -StartupProject Fcg.Payment.API -Connection "Ser
 * **Infra AWS**:
   * **ECS Fargate** + **ALB** (Path `/payments/*`)
   * **SQS FIFO** `fcgPayment.fifo` (+ DLQ)
-  * **RDS** (SQL Server/Postgres)
-  * **API Gateway** (opcional, se optar por gerenciar chaves/limites no edge)
+  * **RDS** (SQL Server)
   * **CloudWatch Logs** / **X-Ray** / **OTel Collector**
 
