@@ -38,7 +38,7 @@ Ele se integra ao “PSP” (provedor de pagamentos simulado) e dispara o evento
 * **Swagger/OpenAPI**
 * **xUnit** (tests)
 * **Docker** (runtime ASP.NET 8)
-* (Opcional) **OpenTelemetry** / **AWS X-Ray** para tracing distribuído
+* **OpenTelemetry** / **AWS X-Ray** para tracing distribuído
 
 ---
 
