@@ -54,11 +54,11 @@ public class PaymentAppService : IPaymentAppService
 		// Garante Id gerado/persistência antes do PSP
 
 		var paymentCreatedEvent = PaymentEvent.Create(payment, PaymentEventType.PaymentCreated);
+
 		// Criar evento após a adição ao banco para garantir existência do Id
-
 		await _uow.EventModelRepository.AddAsync(paymentCreatedEvent, cancellationToken);
-		// Salvar evento de pagamento criado
 
+		// Salvar evento de pagamento criado
 		await this._uow.CommitAsync(cancellationToken);
 
 		// Cria o checkout no PSP e vincula o PSP reference no domínio
@@ -68,11 +68,11 @@ public class PaymentAppService : IPaymentAppService
 		payment.BindPspReference(pspRef);
 
 		var paymentUpdatedEvent = PaymentEvent.Create(payment, PaymentEventType.PspPaymentBinded);
+
 		// Criar evento com o bind do psp feito
-
 		await _uow.EventModelRepository.AddAsync(paymentUpdatedEvent, cancellationToken);
-		// Salvar evento de pagamento atualizado
 
+		// Salva evento de pagamento atualizado
 		await this._uow.CommitAsync(cancellationToken);
 
 		// Resposta + registro da idempotência
