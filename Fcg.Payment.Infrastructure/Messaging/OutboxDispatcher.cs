@@ -55,24 +55,23 @@ public class OutboxDispatcher : BackgroundService
                 {
                     try
                     {
+                        // Escolha de agrupamento, por compra (purchaseId) ou por usuário (userId).
+                        (string groupId, string dedupId) = BuildFifoMetadata(msg);
+
                         SendMessageRequest req = new()
                         {
                             QueueUrl = this._queueUrl,
                             MessageBody = msg.PayloadJson,
                             MessageAttributes = new()
                             {
-                                ["Type"] = new() { DataType = "String", StringValue = msg.Type }
+                                ["Type"] = new() { DataType = "String", StringValue = msg.Type },
+                                ["CorrelationId"] = new() { DataType = "String", StringValue = groupId },
+                                ["ContentType"] = new() { DataType = "String", StringValue = "application/json" }
                             }
                         };
 
-                        if (IsFifoQueue(this._queueUrl))
-                        {
-                            // Escolha de agrupamento, por compra (purchaseId) ou por usuário (userId).
-                            (string groupId, string dedupId) = BuildFifoMetadata(msg);
-
-                            req.MessageGroupId = groupId;
-                            req.MessageDeduplicationId = dedupId;
-                        }
+                        req.MessageGroupId = groupId;
+                        req.MessageDeduplicationId = dedupId;
 
                         await this._sqs.SendMessageAsync(req, cancellationToken);
                         msg.SentAt = DateTimeOffset.UtcNow;
@@ -90,9 +89,6 @@ public class OutboxDispatcher : BackgroundService
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
         }
     }
-
-    private static bool IsFifoQueue(string url) =>
-        url.EndsWith(".fifo", StringComparison.OrdinalIgnoreCase);
 
     private static (string groupId, string dedupId) BuildFifoMetadata(OutboxMessage msg)
     {
