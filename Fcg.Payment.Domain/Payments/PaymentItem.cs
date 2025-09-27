@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Fcg.Payment.Domain.Payments;
 
 public class PaymentItem
@@ -15,5 +17,6 @@ public class PaymentItem
     public decimal UnitPrice { get; private set; }
     public decimal Total => this.UnitPrice;
 
-    public Payment Payment { get; private set; } = null!;
+	[JsonIgnore]
+	public Payment Payment { get; private set; } = null!;
 }

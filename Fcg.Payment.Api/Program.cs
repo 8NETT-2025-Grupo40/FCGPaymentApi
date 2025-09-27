@@ -1,10 +1,10 @@
 using Amazon.SQS;
 using Fcg.Payment.API.Endpoints;
+using Fcg.Payment.API.Setup;
+using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Infrastructure;
 using Fcg.Payment.Infrastructure.PaymentServiceProvider;
-using Fcg.Payment.API.Setup;
 using Serilog;
-using Fcg.Payment.Application.Ports;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()

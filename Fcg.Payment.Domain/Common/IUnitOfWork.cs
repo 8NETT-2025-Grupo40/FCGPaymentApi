@@ -14,4 +14,5 @@ public interface IUnitOfWork : IDisposable
     Task<int> CommitAsync(CancellationToken cancellationToken);
 
     IPaymentRepository PaymentRepository { get; }
+    IEventModelRepository EventModelRepository { get; }
 }
