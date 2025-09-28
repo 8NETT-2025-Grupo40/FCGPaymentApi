@@ -77,13 +77,32 @@ public class OutboxDispatcher : BackgroundService
                         req.MessageGroupId = groupId;
                         req.MessageDeduplicationId = dedupId;
 
-                        using var pub = Activity.Current ?? SqsSource.StartActivity(
-                            "SQS Publish payment.confirmed", ActivityKind.Producer);
+                        using var pub = Activity.Current ??
+                                        PaymentTelemetry.Source.StartActivity(
+                                            "SQS Publish payment.confirmed", ActivityKind.Producer);
 
-                        var hdr = InjectXRayHeader(pub, req);
-                        _logger.LogInformation("Enviando SQS com AWSTraceHeader={Hdr}", hdr);
 
-                        await this._sqs.SendMessageAsync(req, cancellationToken);
+                        if (pub is null)
+                        {
+                            // fallback raríssimo: se ainda vier null, cria um Activity “manual”
+                            var fallback = new Activity("SQS Publish (fallback)");
+                            fallback.SetIdFormat(ActivityIdFormat.W3C);
+                            fallback.Start();
+                            try
+                            {
+                                var hdr = InjectXRayHeader(fallback, req);
+                                _logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
+                                await _sqs.SendMessageAsync(req, cancellationToken);
+                            }
+                            finally { fallback.Stop(); }
+                        }
+                        else
+                        {
+                            var hdr = InjectXRayHeader(pub, req);
+                            _logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
+                            await _sqs.SendMessageAsync(req, cancellationToken);
+                        }
+
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
@@ -120,16 +139,20 @@ public class OutboxDispatcher : BackgroundService
         return (groupId, dedupId);
     }
 
-    static readonly ActivitySource SqsSource = new("FCG.Payment");
+    public static class PaymentTelemetry
+    {
+        public static readonly ActivitySource Source = new("FCG.Payment");
+    }
 
-    private static string InjectXRayHeader(Activity? act, SendMessageRequest req)
+    private
+        static string InjectXRayHeader(Activity act, SendMessageRequest req)
     {
         var propagator = new AWSXRayPropagator();
         req.MessageSystemAttributes ??= new();
 
         string? headerValue = null;
         propagator.Inject(
-            new PropagationContext(act?.Context ?? default, Baggage.Current),
+            new PropagationContext(act.Context, Baggage.Current),
             req,
             (carrier, key, value) =>
             {
@@ -143,5 +166,6 @@ public class OutboxDispatcher : BackgroundService
 
         return headerValue ?? "<no-header>";
     }
+
 
 }
