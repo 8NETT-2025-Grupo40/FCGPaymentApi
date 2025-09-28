@@ -29,6 +29,7 @@ namespace Fcg.Payment.API.Setup
                     .AddHttpClientInstrumentation()
                     // Spans de queries/persistência
                     .AddEntityFrameworkCoreInstrumentation()
+                    .AddSource("FCG.Payment")
                     // Exporta pro collector (ADOT/X-Ray)
                     .AddOtlpExporter());
 
