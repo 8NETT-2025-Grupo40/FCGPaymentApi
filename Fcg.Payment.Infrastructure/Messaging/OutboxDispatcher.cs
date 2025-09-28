@@ -77,17 +77,8 @@ public class OutboxDispatcher : BackgroundService
                         req.MessageGroupId = groupId;
                         req.MessageDeduplicationId = dedupId;
 
-                        using var act = Activity.Current ?? PaymentTelemetry.Source
-                            .StartActivity("SQS Publish payment.confirmed", ActivityKind.Producer);
+                        await this.SendMessageAsync(req, cancellationToken);
 
-                        var activity = act ?? new Activity("SQS Publish (fallback)").SetIdFormat(ActivityIdFormat.W3C);
-                        if (act is null) activity.Start();   // fallback
-
-                        var hdr = InjectXRayHeader(activity, req); // injeta AWSTraceHeader
-                        _logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
-                        await _sqs.SendMessageAsync(req, cancellationToken);
-
-                        if (act is null) activity.Stop();
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
@@ -101,6 +92,41 @@ public class OutboxDispatcher : BackgroundService
             }
 
             await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+        }
+    }
+
+    private async Task SendMessageAsync(SendMessageRequest req, CancellationToken cancellationToken)
+    {
+        // Tenta usar o Activity atual (ex.: veio de uma request HTTP).
+        // Se não houver (fora do pipeline HTTP ou sampler dropou),
+        // cria um span do tipo Producer para representar o publish no SQS.
+        using Activity? act = Activity.Current
+                              ?? PaymentTelemetry.Source.StartActivity(
+                                  "SQS Publish payment.confirmed", ActivityKind.Producer);
+
+        // Se StartActivity retornou null (ninguém escutando a Source ou sampling desligado),
+        // criamos um Activity "fallback" só para ter TraceId/SpanId válidos
+        // e conseguir gerar o AWSTraceHeader mesmo assim.
+        var activity = act ?? new Activity("SQS Publish (fallback)")
+            .SetIdFormat(ActivityIdFormat.W3C);  // garante formato W3C (necessário p/ propagação)
+        if (act is null)
+        {
+            activity.Start(); // sem Start() o Activity não gera IDs
+        }
+
+        // Injeta o cabeçalho do X-Ray na mensagem SQS (MessageSystemAttributes["AWSTraceHeader"]).
+        // Isso é o que permite o X-Ray "ligar" Producer → SQS → Lambda no Trace Map.
+        var hdr = InjectXRayHeader(activity, req);
+        this._logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
+
+        // Publica na fila (cada retry deve criar um HttpRequestMessage novo — você já faz isso acima).
+        await this._sqs.SendMessageAsync(req, cancellationToken);
+
+        // Se usamos o fallback, precisamos parar manualmente.
+        // Se "act" não é null, o using chama Dispose() e dá o Stop() para a gente.
+        if (act is null)
+        {
+            activity.Stop();
         }
     }
 
@@ -124,13 +150,7 @@ public class OutboxDispatcher : BackgroundService
         return (groupId, dedupId);
     }
 
-    public static class PaymentTelemetry
-    {
-        public static readonly ActivitySource Source = new("FCG.Payment");
-    }
-
-    private
-        static string InjectXRayHeader(Activity act, SendMessageRequest req)
+    private static string InjectXRayHeader(Activity act, SendMessageRequest req)
     {
         var propagator = new AWSXRayPropagator();
         req.MessageSystemAttributes ??= new();
@@ -152,5 +172,10 @@ public class OutboxDispatcher : BackgroundService
         return headerValue ?? "<no-header>";
     }
 
-
 }
+public static class PaymentTelemetry
+{
+    public static readonly string FcgPaymentPublisherSourceName = "FCG.Payment";
+    public static readonly ActivitySource Source = new(FcgPaymentPublisherSourceName);
+}
+

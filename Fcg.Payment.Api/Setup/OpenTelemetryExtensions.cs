@@ -1,4 +1,5 @@
-﻿using OpenTelemetry;
+﻿using Fcg.Payment.Infrastructure.Messaging;
+using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Extensions.AWS.Trace;
 using OpenTelemetry.Resources;
@@ -29,7 +30,7 @@ namespace Fcg.Payment.API.Setup
                     .AddHttpClientInstrumentation()
                     // Spans de queries/persistência
                     .AddEntityFrameworkCoreInstrumentation()
-                    .AddSource("FCG.Payment")
+                    .AddSource(PaymentTelemetry.FcgPaymentPublisherSourceName)
                     // Exporta pro collector (ADOT/X-Ray)
                     .AddOtlpExporter());
 
