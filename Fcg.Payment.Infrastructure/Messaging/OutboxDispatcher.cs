@@ -78,7 +78,8 @@ public class OutboxDispatcher : BackgroundService
                         req.MessageDeduplicationId = dedupId;
 
                         var activity = Activity.Current;
-                        InjectXRayHeader(activity, req);
+                        var hdr = InjectXRayHeader(activity, req);
+                        _logger.LogInformation("Enviando SQS com AWSTraceHeader={Hdr}", hdr);
 
                         await this._sqs.SendMessageAsync(req, cancellationToken);
                         msg.SentAt = DateTimeOffset.UtcNow;
@@ -117,23 +118,26 @@ public class OutboxDispatcher : BackgroundService
         return (groupId, dedupId);
     }
 
-    private static void InjectXRayHeader(Activity? act, SendMessageRequest req)
+    private static string InjectXRayHeader(Activity? act, SendMessageRequest req)
     {
         var propagator = new AWSXRayPropagator();
-        req.MessageSystemAttributes ??= new Dictionary<string, MessageSystemAttributeValue>();
+        string? headerValue = null;
 
+        req.MessageSystemAttributes ??= new();
         propagator.Inject(
             new PropagationContext(act?.Context ?? default, Baggage.Current),
             req,
             (carrier, key, value) =>
             {
-                // o propagator gera a chave HTTP "x-amzn-trace-id"
                 if (key.Equals("x-amzn-trace-id", StringComparison.OrdinalIgnoreCase))
                 {
+                    headerValue = value; // guarda para log
                     carrier.MessageSystemAttributes["AWSTraceHeader"] =
                         new MessageSystemAttributeValue { DataType = "String", StringValue = value };
                 }
             });
+
+        return headerValue ?? "<no-header>";
     }
 
 }
