@@ -77,32 +77,17 @@ public class OutboxDispatcher : BackgroundService
                         req.MessageGroupId = groupId;
                         req.MessageDeduplicationId = dedupId;
 
-                        using var pub = Activity.Current ??
-                                        PaymentTelemetry.Source.StartActivity(
-                                            "SQS Publish payment.confirmed", ActivityKind.Producer);
+                        using var act = Activity.Current ?? PaymentTelemetry.Source
+                            .StartActivity("SQS Publish payment.confirmed", ActivityKind.Producer);
 
+                        var activity = act ?? new Activity("SQS Publish (fallback)").SetIdFormat(ActivityIdFormat.W3C);
+                        if (act is null) activity.Start();   // fallback
 
-                        if (pub is null)
-                        {
-                            // fallback raríssimo: se ainda vier null, cria um Activity “manual”
-                            var fallback = new Activity("SQS Publish (fallback)");
-                            fallback.SetIdFormat(ActivityIdFormat.W3C);
-                            fallback.Start();
-                            try
-                            {
-                                var hdr = InjectXRayHeader(fallback, req);
-                                _logger.LogInformation("(fallback) AWSTraceHeader={Hdr}", hdr);
-                                await _sqs.SendMessageAsync(req, cancellationToken);
-                            }
-                            finally { fallback.Stop(); }
-                        }
-                        else
-                        {
-                            var hdr = InjectXRayHeader(pub, req);
-                            _logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
-                            await _sqs.SendMessageAsync(req, cancellationToken);
-                        }
+                        var hdr = InjectXRayHeader(activity, req); // injeta AWSTraceHeader
+                        _logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
+                        await _sqs.SendMessageAsync(req, cancellationToken);
 
+                        if (act is null) activity.Stop();
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
                     catch (Exception ex)
