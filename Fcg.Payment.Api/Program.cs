@@ -13,6 +13,9 @@ Log.Logger = new LoggerConfiguration()
 var builder = WebApplication.CreateBuilder(args);
 
 // Services
+builder.ConfigureSerilog();
+builder.Services.SetupOpenTelemetry();
+
 builder.Services.RegisterServices();
 builder.Services.RegisterMiddlewares();
 // AWS Options + SQS client
@@ -26,9 +29,6 @@ builder.Services.AddDbContextConfiguration(builder.Configuration);
 builder.Services
     .AddHealthChecks()
     .AddCheck<DbContextHealthCheck<PaymentDbContext>>("DbContext_Check");
-
-builder.ConfigureSerilog();
-builder.Services.SetupOpenTelemetry();
 
 var app = builder.Build();
 
