@@ -91,7 +91,7 @@ public class OutboxDispatcher : BackgroundService
                             try
                             {
                                 var hdr = InjectXRayHeader(fallback, req);
-                                _logger.LogInformation("AWSTraceHeader={Hdr}", hdr);
+                                _logger.LogInformation("(fallback) AWSTraceHeader={Hdr}", hdr);
                                 await _sqs.SendMessageAsync(req, cancellationToken);
                             }
                             finally { fallback.Stop(); }
