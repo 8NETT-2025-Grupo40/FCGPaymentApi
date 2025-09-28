@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Amazon.SQS;
 using Amazon.SQS.Model;
@@ -6,6 +7,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry;
+using OpenTelemetry.Context.Propagation;
+using OpenTelemetry.Extensions.AWS.Trace;
 
 namespace Fcg.Payment.Infrastructure.Messaging;
 
@@ -73,6 +77,9 @@ public class OutboxDispatcher : BackgroundService
                         req.MessageGroupId = groupId;
                         req.MessageDeduplicationId = dedupId;
 
+                        var activity = Activity.Current;
+                        InjectXRayHeader(activity, req);
+
                         await this._sqs.SendMessageAsync(req, cancellationToken);
                         msg.SentAt = DateTimeOffset.UtcNow;
                     }
@@ -109,4 +116,24 @@ public class OutboxDispatcher : BackgroundService
         string dedupId = msg.Id.ToString();
         return (groupId, dedupId);
     }
+
+    private static void InjectXRayHeader(Activity? act, SendMessageRequest req)
+    {
+        var propagator = new AWSXRayPropagator();
+        req.MessageSystemAttributes ??= new Dictionary<string, MessageSystemAttributeValue>();
+
+        propagator.Inject(
+            new PropagationContext(act?.Context ?? default, Baggage.Current),
+            req,
+            (carrier, key, value) =>
+            {
+                // o propagator gera a chave HTTP "x-amzn-trace-id"
+                if (key.Equals("x-amzn-trace-id", StringComparison.OrdinalIgnoreCase))
+                {
+                    carrier.MessageSystemAttributes["AWSTraceHeader"] =
+                        new MessageSystemAttributeValue { DataType = "String", StringValue = value };
+                }
+            });
+    }
+
 }

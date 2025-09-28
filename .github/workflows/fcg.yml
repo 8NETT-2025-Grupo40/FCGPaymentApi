@@ -79,8 +79,9 @@ jobs:
   migration:
     name: Deploy DB (migrations)
     needs: [build, tests]
-    environment: production
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # TODO: habilitar para produção
+    # environment: production
+    # if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: 
       - self-hosted
       - linux
