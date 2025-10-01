@@ -2,6 +2,7 @@
 using Fcg.Payment.Domain.Payments;
 using Fcg.Payment.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 
 namespace Fcg.Payment.Infrastructure.Repositories
 {
@@ -14,7 +15,7 @@ namespace Fcg.Payment.Infrastructure.Repositories
 			_paymentsDbContext = paymentsDbContext;
 		}
 
-		public IEnumerable<EventModel> SelectByStreamId(Guid streamId) =>
-			_paymentsDbContext.EventStore.AsNoTracking().Where(e => e.StreamId == streamId).OrderBy(e => e.DateCreated);
+		public IEnumerable<EventModel> SelectByStreamId(Guid paymentId) =>
+			_paymentsDbContext.EventStore.AsNoTracking().Where(e => e.StreamId == paymentId).OrderBy(e => e.DateCreated).ToList();
 	}
 }

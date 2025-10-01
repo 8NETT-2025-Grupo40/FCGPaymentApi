@@ -1,3 +1,4 @@
+using Fcg.Payment.Application.Events;
 using Fcg.Payment.Application.Payments.Dtos;
 using Fcg.Payment.Application.Ports;
 
@@ -15,4 +16,5 @@ public interface IPaymentAppService
     /// Método responsável por obter um pagamento pelo seu ID.
     /// </summary>
     Task<PaymentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+	EventsResponse? GetEventsByPaymentId(Guid id);
 }

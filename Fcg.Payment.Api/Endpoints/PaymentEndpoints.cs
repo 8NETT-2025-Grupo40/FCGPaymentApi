@@ -1,4 +1,5 @@
-﻿using Fcg.Payment.Application.Payments;
+﻿using Fcg.Payment.Application.Events;
+using Fcg.Payment.Application.Payments;
 using Fcg.Payment.Application.Payments.Dtos;
 using Fcg.Payment.Application.Ports;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -35,6 +36,10 @@ public static class PaymentEndpoints
         payments.MapGet("/{id:guid}", GetPaymentById)
             .WithName(nameof(GetPaymentById))
             .WithSummary("Get payment by id");
+
+        payments.MapGet("/events", GetEventsByPaymentId)
+            .WithName(nameof(GetEventsByPaymentId))
+            .WithSummary("Get events from payment id");
     }
 
     private static async Task<Results<CreatedAtRoute<CreatePaymentResponse>, BadRequest<object>>> CreatePayment(
@@ -70,4 +75,15 @@ public static class PaymentEndpoints
             ? TypedResults.Ok(response)
             : TypedResults.NotFound();
     }
+
+	private static Results<Ok<EventsResponse>, NotFound> GetEventsByPaymentId(
+		Guid paymentId,
+		IPaymentAppService service)
+	{
+		var response = service.GetEventsByPaymentId(paymentId);
+
+		return response is not null
+			? TypedResults.Ok(response)
+			: TypedResults.NotFound();
+	}
 }

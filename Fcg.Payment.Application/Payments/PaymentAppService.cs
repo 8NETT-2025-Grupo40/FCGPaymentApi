@@ -1,3 +1,4 @@
+using Fcg.Payment.Application.Events;
 using Fcg.Payment.Application.Payments.Dtos;
 using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain.Common;
@@ -86,5 +87,42 @@ public class PaymentAppService : IPaymentAppService
 	{
 		Domain.Payments.Payment? payment = await this._uow.PaymentRepository.GetByPaymentIdAsync(id, cancellationToken);
 		return payment is null ? null : new PaymentResponse(payment);
+	}
+
+	public EventsResponse GetEventsByPaymentId(Guid id)
+	{
+		var events = _uow.EventModelRepository.SelectByStreamId(id);
+
+		if (events is null || !events.Any())
+		{
+			return null;
+		}
+
+		var details = new List<EventDetailResponse>(events.Count());
+
+		Guid userId = Guid.Empty;
+
+		foreach (var e in events)
+		{
+			var payment = JsonSerializer.Deserialize<PaymentResponse>(e.EventData);
+
+			if (payment is null)
+			{
+				continue;
+			}
+
+			if (userId == Guid.Empty)
+			{
+				userId = payment.UserId;
+			}
+
+			var paymentEvent = new EventPaymentResponse(payment.Status, payment.Amount, payment.Currency, payment.PspReference ?? string.Empty, payment.Items);
+
+			var detail = new EventDetailResponse(paymentEvent, e.EventType, e.DateCreated);
+
+			details.Add(detail);
+		}
+
+		return new EventsResponse(id, userId, details);
 	}
 }
