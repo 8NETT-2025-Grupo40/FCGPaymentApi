@@ -16,6 +16,7 @@ public static class DependencyInjection
     {
         // Payment
         services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IEventModelRepository, EventModelRepository>();
         services.AddScoped<IPaymentAppService, PaymentAppService>();
 
         // Infra

@@ -1,4 +1,5 @@
 ﻿using Fcg.Payment.Domain.Payments;
+using System.Text.Json.Serialization;
 
 namespace Fcg.Payment.Application.Payments.Dtos
 {
@@ -12,7 +13,13 @@ namespace Fcg.Payment.Application.Payments.Dtos
         public string? PspReference { get; set; }
         public List<PaymentItemResponse> Items { get; set; }
 
-        public PaymentResponse(Domain.Payments.Payment payment)
+        [JsonConstructor]
+		public PaymentResponse()
+		{
+			
+		}
+
+		public PaymentResponse(Domain.Payments.Payment payment)
         {
             this.PaymentId = payment.Id;
             this.UserId = payment.UserId;

@@ -1,75 +1,128 @@
-using System.Text.Json;
+using Fcg.Payment.Application.Events;
 using Fcg.Payment.Application.Payments.Dtos;
 using Fcg.Payment.Application.Ports;
 using Fcg.Payment.Domain.Common;
+using Fcg.Payment.Domain.Common.EventSourcing;
+using Fcg.Payment.Domain.Common.EventSourcing.Payment;
+using System.Text.Json;
 
 namespace Fcg.Payment.Application.Payments;
 
 public class PaymentAppService : IPaymentAppService
 {
-    private readonly IUnitOfWork _uow;
-    private readonly IIdempotencyStore _idemp;
+	private readonly IUnitOfWork _uow;
+	private readonly IIdempotencyStore _idemp;
 
-    public PaymentAppService(IUnitOfWork uow, IIdempotencyStore idemp)
-    {
-        this._uow = uow;
-        this._idemp = idemp;
-    }
+	public PaymentAppService(IUnitOfWork uow, IIdempotencyStore idemp)
+	{
+		this._uow = uow;
+		this._idemp = idemp;
+	}
 
-    public async Task<CreatePaymentResponse> CreateAsync(
-        CreatePaymentRequest req,
-        string idemKey,
-        IPspClient psp,
-        CancellationToken cancellationToken)
-    {
-        // Idempotência da criação
-        string? existing = await this._idemp.GetResponseAsync(idemKey, cancellationToken);
-        if (existing is not null)
-        {
-            return JsonSerializer.Deserialize<CreatePaymentResponse>(existing)!;
-        }
+	public async Task<CreatePaymentResponse> CreateAsync(
+		CreatePaymentRequest req,
+		string idemKey,
+		IPspClient psp,
+		CancellationToken cancellationToken)
+	{
+		// Idempotência da criação
+		string? existing = await this._idemp.GetResponseAsync(idemKey, cancellationToken);
+		if (existing is not null)
+		{
+			return JsonSerializer.Deserialize<CreatePaymentResponse>(existing)!;
+		}
 
-        // Validacões simples de entrada
-        if (req is null)
-        {
-            throw new ArgumentNullException(nameof(req));
-        }
+		// Validacões simples de entrada
+		if (req is null)
+		{
+			throw new ArgumentNullException(nameof(req));
+		}
 
-        if (req.Items is null || !req.Items.Any())
-        {
-            throw new InvalidOperationException("Payment must have at least one item.");
-        }
+		if (req.Items is null || !req.Items.Any())
+		{
+			throw new InvalidOperationException("Payment must have at least one item.");
+		}
 
-        // Cria o agregado em Pending e adiciona itens
-        Domain.Payments.Payment payment = Domain.Payments.Payment.Create(req.UserId, req.Currency);
+		// Cria o agregado em Pending e adiciona itens
+		Domain.Payments.Payment payment = Domain.Payments.Payment.Create(req.UserId, req.Currency);
 
-        foreach (CreatePaymentItem i in req.Items)
-        {
-            payment.AddItem(i.GameId, i.UnitPrice);
-        }
+		foreach (CreatePaymentItem i in req.Items)
+		{
+			payment.AddItem(i.GameId, i.UnitPrice);
+		}
 
-        await this._uow.PaymentRepository.AddAsync(payment, cancellationToken);
-        // Garante Id gerado/persistência antes do PSP
-        await this._uow.CommitAsync(cancellationToken);
+		await this._uow.PaymentRepository.AddAsync(payment, cancellationToken);
+		// Garante Id gerado/persistência antes do PSP
 
-        // Cria o checkout no PSP e vincula o PSP reference no domínio
-        (string checkoutUrl, string pspRef) = await psp.CreateCheckoutAsync(payment, cancellationToken);
+		var paymentCreatedEvent = PaymentEvent.Create(payment, PaymentEventType.PaymentCreated);
 
-        // Lança se vier nulo/branco ou conflitante
-        payment.BindPspReference(pspRef);
+		// Criar evento após a adição ao banco para garantir existência do Id
+		await _uow.EventModelRepository.AddAsync(paymentCreatedEvent, cancellationToken);
 
-        await this._uow.CommitAsync(cancellationToken);
+		// Salvar evento de pagamento criado
+		await this._uow.CommitAsync(cancellationToken);
 
-        // Resposta + registro da idempotência
-        CreatePaymentResponse resp = new(payment.Id, checkoutUrl);
-        await this._idemp.SaveResponseAsync(idemKey, JsonSerializer.Serialize(resp), cancellationToken);
+		// Cria o checkout no PSP e vincula o PSP reference no domínio
+		(string checkoutUrl, string pspRef) = await psp.CreateCheckoutAsync(payment, cancellationToken);
 
-        return resp;
-    }
+		// Lança se vier nulo/branco ou conflitante
+		payment.BindPspReference(pspRef);
 
-    public async Task<PaymentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
-    {
-        Domain.Payments.Payment? payment = await this._uow.PaymentRepository.GetByPaymentIdAsync(id, cancellationToken);
-        return payment is null ? null : new PaymentResponse(payment);
-    }
+		var paymentUpdatedEvent = PaymentEvent.Create(payment, PaymentEventType.PspPaymentBinded);
+
+		// Criar evento com o bind do psp feito
+		await _uow.EventModelRepository.AddAsync(paymentUpdatedEvent, cancellationToken);
+
+		// Salva evento de pagamento atualizado
+		await this._uow.CommitAsync(cancellationToken);
+
+		// Resposta + registro da idempotência
+		CreatePaymentResponse resp = new(payment.Id, checkoutUrl);
+		await this._idemp.SaveResponseAsync(idemKey, JsonSerializer.Serialize(resp), cancellationToken);
+
+		return resp;
+	}
+
+	public async Task<PaymentResponse?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+	{
+		Domain.Payments.Payment? payment = await this._uow.PaymentRepository.GetByPaymentIdAsync(id, cancellationToken);
+		return payment is null ? null : new PaymentResponse(payment);
+	}
+
+	public EventsResponse GetEventsByPaymentId(Guid id)
+	{
+		var events = _uow.EventModelRepository.SelectByStreamId(id);
+
+		if (events is null || !events.Any())
+		{
+			return null;
+		}
+
+		var details = new List<EventDetailResponse>(events.Count());
+
+		Guid userId = Guid.Empty;
+
+		foreach (var e in events)
+		{
+			var payment = JsonSerializer.Deserialize<PaymentResponse>(e.EventData);
+
+			if (payment is null)
+			{
+				continue;
+			}
+
+			if (userId == Guid.Empty)
+			{
+				userId = payment.UserId;
+			}
+
+			var paymentEvent = new EventPaymentResponse(payment.Status, payment.Amount, payment.Currency, payment.PspReference ?? string.Empty, payment.Items);
+
+			var detail = new EventDetailResponse(paymentEvent, e.EventType, e.DateCreated);
+
+			details.Add(detail);
+		}
+
+		return new EventsResponse(id, userId, details);
+	}
 }
