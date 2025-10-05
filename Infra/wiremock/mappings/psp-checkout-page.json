@@ -4,6 +4,6 @@
     "status": 200,
     "headers": { "Content-Type": "text/html; charset=utf-8" },
     "transformers": ["response-template"],
-"body": "<!doctype html><html><body style='font-family:sans-serif'><h2>Mock PSP — Checkout {{request.pathSegments.[2]}}</h2><form method='post' action='/psp/simulate/capture/{{request.pathSegments.[2]}}'><button>Aprovar (Capture)</button></form><form method='post' action='/psp/simulate/fail/{{request.pathSegments.[2]}}' style='margin-top:8px'><button>Falhar</button></form></body></html>"
+"body": "<!doctype html><html><body style='font-family:sans-serif'><h2>Mock PSP — Checkout {{request.pathSegments.[2]}}</h2><form method='post' action='/prod/psp/simulate/capture/{{request.pathSegments.[2]}}'><button>Aprovar (Capture)</button></form><form method='post' action='/prod/psp/simulate/fail/{{request.pathSegments.[2]}}' style='margin-top:8px'><button>Falhar</button></form></body></html>"
   }
 }
