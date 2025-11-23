@@ -19,7 +19,8 @@ otelCollector:
 
 # Número de pods que serão criados inicialmente
 # O HPA (Horizontal Pod Autoscaler) pode aumentar/diminuir baseado em carga
-replicaCount: 2
+# Reduzido para 1 devido ao limite de 8 pods/node em t3a.small
+replicaCount: 1
 
 # Portas dos containers
 containerPort: 5066      # Payment API
