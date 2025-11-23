@@ -121,8 +121,8 @@ secrets:
 # Aumenta/diminui número de pods automaticamente baseado em carga
 autoscaling:
   enabled: true
-  minReplicas: 2  # mínimo de pods (sempre rodando)
-  maxReplicas: 3  # máximo de pods (sob alta carga, conservador para PoC)
+  minReplicas: 1  # reduzido devido ao limite de 8 pods/node em t3a.small
+  maxReplicas: 2  # máximo ajustado para não exceder capacidade do cluster
   cpu: 75         # escala quando CPU média > 75%
   memory: 75      # escala quando memória média > 75%
 
