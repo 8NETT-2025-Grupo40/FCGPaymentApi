@@ -259,24 +259,8 @@ jobs:
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
           helm version
       
-      # Valida que o External Secrets Operator está instalado (via FCGInfra)
-      # Se não estiver, o deploy falhará com erro claro
-      - name: Verify External Secrets Operator
-        run: |
-          echo "Checking if External Secrets Operator is installed..."
-          
-          if ! kubectl get crd externalsecrets.external-secrets.io &>/dev/null; then
-            echo "ERROR: External Secrets Operator não está instalado!"
-            echo ""
-            echo "O External Secrets Operator é instalado via FCGInfra."
-            echo "Execute o workflow 'Setup EKS Cluster & Add-ons' no repositório FCGInfra primeiro:"
-            echo "https://github.com/8NETT-2025-Grupo40/FCGInfra/actions/workflows/cluster-setup.yml"
-            echo ""
-            exit 1
-          fi
-          
-          echo "External Secrets Operator está instalado"
-          kubectl get deployment -n external-secrets external-secrets
+      # External Secrets Operator é instalado via FCGInfra no namespace "external-secrets"
+      # Não é necessário instalar aqui - o operator é cluster-wide
       
       # Deploy usando Helm (upgrade --install: instala ou atualiza)
       - name: Deploy to EKS with Helm
