@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fcg-payment-api
+description: A Helm chart for FCG Payment API on Kubernetes (EKS)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
