@@ -261,6 +261,26 @@ jobs:
       
       # External Secrets Operator é instalado via FCGInfra no namespace "external-secrets"
       # Não é necessário instalar aqui - o operator é cluster-wide
+      # Aguarda CRDs estarem disponíveis antes do deploy
+      - name: Wait for External Secrets CRDs
+        run: |
+          echo "Verifying External Secrets Operator CRDs..."
+          
+          # Aguarda até 120 segundos pelos CRDs
+          for i in {1..24}; do
+            if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1 && \
+               kubectl get crd secretstores.external-secrets.io >/dev/null 2>&1; then
+              echo "✓ External Secrets CRDs are available"
+              exit 0
+            fi
+            echo "Waiting for CRDs... attempt $i/24"
+            sleep 5
+          done
+          
+          echo "ERROR: External Secrets CRDs not found after 120s"
+          echo "Available CRDs:"
+          kubectl get crd | grep -i external || echo "No external CRDs found"
+          exit 1
       
       # Deploy usando Helm (upgrade --install: instala ou atualiza)
       - name: Deploy to EKS with Helm
