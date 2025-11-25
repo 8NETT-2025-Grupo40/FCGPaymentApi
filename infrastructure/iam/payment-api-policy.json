@@ -31,6 +31,15 @@
         "kms:GenerateDataKey"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "XRayAccess",
+      "Effect": "Allow",
+      "Action": [
+        "xray:PutTraceSegments",
+        "xray:PutTelemetryRecords"
+      ],
+      "Resource": "*"
     }
   ]
 }
