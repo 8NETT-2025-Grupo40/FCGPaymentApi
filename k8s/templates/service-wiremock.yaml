@@ -1,0 +1,19 @@
+# Service adicional para WireMock (sidecar)
+# Expõe a porta 5166 do mesmo Deployment
+# Permite roteamento externo via /psp (mantém comportamento ECS)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fcg-payment-api.fullname" . }}-wiremock
+  labels:
+    {{- include "fcg-payment-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wiremock
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.wiremockPort }}
+      targetPort: {{ .Values.service.wiremockTargetPort }}
+      protocol: TCP
+      name: wiremock
+  selector:
+    {{- include "fcg-payment-api.selectorLabels" . | nindent 4 }}

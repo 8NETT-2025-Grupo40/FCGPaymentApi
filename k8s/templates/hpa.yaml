@@ -1,0 +1,30 @@
+{{- if .Values.autoscaling.enabled }}
+# HPA (Horizontal Pod Autoscaler): escalonamento automático de pods
+# Aumenta/diminui réplicas baseado em métricas de CPU e memória
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "fcg-payment-api.fullname" . }}
+  labels:
+    {{- include "fcg-payment-api.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "fcg-payment-api.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.cpu }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.autoscaling.memory }}
+{{- end }}

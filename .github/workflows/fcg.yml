@@ -8,13 +8,12 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPOSITORY: fcg-payment-api
   ECR_REPOSITORY_WIREMOCK: fcg-psp-wiremock
-  ECS_SERVICE: FCG-TSK-PAYMENT-ECS-service-uudjbbgl
-  ECS_CLUSTER: FCG-Cluster
-  ECS_TASK_DEFINITION: .github/ecs/ecs-task-def.json
-  CONTAINER_NAME: fcg-payment-api
-  CONTAINER_NAME_WIREMOCK: fcg-psp-wiremock
+  EKS_CLUSTER: fcg
+  K8S_NAMESPACE: fcg
+  HELM_RELEASE_NAME: payment-api
 
 jobs:
   build:
@@ -80,7 +79,6 @@ jobs:
     name: Deploy DB (migrations)
     needs: [build, tests]
     environment: production
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: 
       - self-hosted
       - linux
@@ -88,14 +86,14 @@ jobs:
     env:
       # Declaramos aqui a variável vazia para o linter/intellisense do GitHub Actions
       # entender que ela existe. O valor real é atribuído em tempo de execução
-      # pelo passo “Get RDS connection string” via $GITHUB_ENV.
+      # pelo passo "Get RDS connection string" via $GITHUB_ENV.
       RDS_CONNECTION_STRING: ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -124,123 +122,223 @@ jobs:
             --project Fcg.Payment.Api/Fcg.Payment.API.csproj \
             --connection "$ConnectionStrings__DefaultConnection"
 
-  wiremock_image:
-    name: Build and Push WireMock image
-    needs: [build, tests, migration]
+  build-push:
+    name: Build and Push Docker Images (API + WireMock)
+    needs: [build, tests]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      wiremock-tag: ${{ steps.meta.outputs.wiremock-tags }}
     
-      - name: Build, tag and push WireMock
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          TAG="${GITHUB_SHA::7}"
-          IMG_SHA="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
-          IMG_LATEST="$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:latest"
-
-          docker build -t wm:ci -f Infra/wiremock/Dockerfile Infra/wiremock
-          docker tag wm:ci "$IMG_SHA"
-          docker tag wm:ci "$IMG_LATEST"
-
-          docker push "$IMG_SHA"
-          docker push "$IMG_LATEST"
-
-  api_image:
-    name: Build and Push API Payment image
-    needs: [build, tests, migration]
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
+      
       - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag and push API
+      
+      - name: Generate Docker metadata
+        id: meta
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          TAG="${GITHUB_SHA::7}"
-          IMG_SHA="$REG/${{ env.ECR_REPOSITORY }}:$TAG"
-          IMG_LATEST="$REG/${{ env.ECR_REPOSITORY }}:latest"
+          IMAGE_TAG="${{ github.sha }}"
+          
+          # Payment API tags
+          echo "tags=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "latest=$ECR_REGISTRY/$ECR_REPOSITORY:latest" >> $GITHUB_OUTPUT
+          
+          # WireMock tags
+          echo "wiremock-tags=$ECR_REGISTRY/$ECR_REPOSITORY_WIREMOCK:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "wiremock-latest=$ECR_REGISTRY/$ECR_REPOSITORY_WIREMOCK:latest" >> $GITHUB_OUTPUT
+      
+      - name: Build and Push Payment API Image
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.tags }}
+          IMAGE_LATEST: ${{ steps.meta.outputs.latest }}
+        run: |
+          echo "Building Payment API Docker image..."
+          docker build -t $IMAGE_TAG -t $IMAGE_LATEST .
+          
+          echo "Pushing to ECR..."
+          docker push $IMAGE_TAG
+          docker push $IMAGE_LATEST
+          
+          echo "Payment API image pushed: $IMAGE_TAG"
+      
+      - name: Build and Push WireMock Image
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.wiremock-tags }}
+          IMAGE_LATEST: ${{ steps.meta.outputs.wiremock-latest }}
+        run: |
+          echo "Building WireMock Docker image..."
+          docker build -t $IMAGE_TAG -t $IMAGE_LATEST -f Infra/wiremock/Dockerfile Infra/wiremock
+          
+          echo "Pushing to ECR..."
+          docker push $IMAGE_TAG
+          docker push $IMAGE_LATEST
+          
+          echo "WireMock image pushed: $IMAGE_TAG"
 
-          docker build -t api:ci .
-          docker tag api:ci "$IMG_SHA"
-          docker tag api:ci "$IMG_LATEST"
-
-          docker push "$IMG_SHA"
-          docker push "$IMG_LATEST"
-
-  deploy:
-    name: Render 2 containers & deploy ECS
-    needs: [wiremock_image, api_image]
+  deploy-eks:
+    needs: [build-push, migration]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: production
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
-        with: 
+        with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Compute image URIs (API & WireMock)
-        id: imgs
+      
+      # Configura kubectl para se conectar ao cluster EKS
+      - name: Update kubeconfig
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REG="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-          TAG="${GITHUB_SHA::7}"
-
-          echo "WM=$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG"
-          echo "API=$REG/${{ env.ECR_REPOSITORY }}:$TAG"
-
-          echo "WM_IMAGE=$REG/${{ env.ECR_REPOSITORY_WIREMOCK }}:$TAG" >> $GITHUB_OUTPUT
-          echo "API_IMAGE=$REG/${{ env.ECR_REPOSITORY }}:$TAG"         >> $GITHUB_OUTPUT
-
-      - name: Render taskdef (WireMock)
-        id: render-wm
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION }}
-          container-name: ${{ env.CONTAINER_NAME_WIREMOCK }}
-          image: ${{ steps.imgs.outputs.WM_IMAGE }}
-
-      - name: Render taskdef (API)
-        id: render-api
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: ${{ steps.render-wm.outputs.task-definition }}
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.imgs.outputs.API_IMAGE }}
-
-      - name: Deploy ECS Task Definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.render-api.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }}
+          kubectl cluster-info
+      
+      # Instala eksctl para criar IRSA
+      - name: Install eksctl
+        run: |
+          curl -sLO "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz"
+          tar -xzf eksctl_Linux_amd64.tar.gz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version
+      
+      # IRSA (IAM Roles for Service Accounts)
+      # Permite que pods assumam roles IAM para acessar Secrets Manager e SQS
+      - name: Create/Update IRSA for Payment API
+        run: |
+          echo "Checking if IRSA already exists..."
+          if kubectl get serviceaccount fcg-payment-api-sa -n ${{ env.K8S_NAMESPACE }} &>/dev/null; then
+            echo "ServiceAccount already exists, skipping IRSA creation"
+          else
+            echo "Creating IAM Policy if not exists..."
+            aws iam create-policy \
+              --policy-name FCGPaymentAPIPolicy \
+              --policy-document file://infrastructure/iam/payment-api-policy.json \
+              --region ${{ env.AWS_REGION }} 2>/dev/null || echo "Policy already exists"
+            
+            echo "Creating IRSA for fcg-payment-api-sa..."
+            eksctl create iamserviceaccount \
+              --cluster=${{ env.EKS_CLUSTER }} \
+              --namespace=${{ env.K8S_NAMESPACE }} \
+              --name=fcg-payment-api-sa \
+              --attach-policy-arn=arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:policy/FCGPaymentAPIPolicy \
+              --approve \
+              --region=${{ env.AWS_REGION }}
+            
+            echo "IRSA created successfully"
+            echo "Waiting 30s for IAM propagation..."
+            sleep 30
+          fi
+      
+      # Helm é o gerenciador de pacotes do Kubernetes
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
+      
+      # External Secrets Operator é instalado via FCGInfra no namespace "external-secrets"
+      # Não é necessário instalar aqui - o operator é cluster-wide
+      # Aguarda CRDs estarem disponíveis antes do deploy
+      - name: Wait for External Secrets CRDs
+        run: |
+          echo "Verifying External Secrets Operator CRDs..."
+          
+          # Aguarda até 120 segundos pelos CRDs
+          for i in {1..24}; do
+            if kubectl get crd externalsecrets.external-secrets.io >/dev/null 2>&1 && \
+               kubectl get crd secretstores.external-secrets.io >/dev/null 2>&1; then
+              echo "✓ External Secrets CRDs are available"
+              exit 0
+            fi
+            echo "Waiting for CRDs... attempt $i/24"
+            sleep 5
+          done
+          
+          echo "ERROR: External Secrets CRDs not found after 120s"
+          echo "Available CRDs:"
+          kubectl get crd | grep -i external || echo "No external CRDs found"
+          exit 1
+      
+      # Deploy usando Helm (upgrade --install: instala ou atualiza)
+      - name: Deploy to EKS with Helm
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "Deploying FCG Payment API to EKS..."
+          
+          helm upgrade --install ${{ env.HELM_RELEASE_NAME }} ./k8s \
+            --namespace ${{ env.K8S_NAMESPACE }} \
+            --create-namespace \
+            --set image.tag=$IMAGE_TAG \
+            --set wiremock.tag=$IMAGE_TAG \
+            --timeout 10m
+          
+          echo "Helm deployment completed"
+      
+      # Aguarda sincronização dos secrets do AWS Secrets Manager
+      - name: Wait for External Secrets sync
+        run: |
+          echo "Waiting for External Secrets to sync..."
+          
+          kubectl wait --for=condition=Ready \
+            externalsecret/${{ env.HELM_RELEASE_NAME }}-fcg-payment-api-externalsecret \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=120s
+          
+          echo "External Secrets synced successfully"
+      
+      # Verifica se deployment foi concluído
+      - name: Verify Deployment
+        run: |
+          echo "Verifying deployment rollout..."
+          
+          DEPLOYMENT_NAME="${{ env.HELM_RELEASE_NAME }}-fcg-payment-api"
+          
+          kubectl rollout status deployment/$DEPLOYMENT_NAME -n ${{ env.K8S_NAMESPACE }} --timeout=10m
+          
+          echo ""
+          echo "Deployment completed successfully"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -l app.kubernetes.io/name=fcg-payment-api
+      
+      # Obtém URL do ALB
+      - name: Get ALB URL
+        run: |
+          INGRESS_NAME="${{ env.HELM_RELEASE_NAME }}-fcg-payment-api"
+          
+          # Aguarda ALB ser provisionado (pode levar alguns minutos)
+          echo "Waiting for ALB to be provisioned..."
+          sleep 30
+          
+          ALB_URL=$(kubectl get ingress -n ${{ env.K8S_NAMESPACE }} $INGRESS_NAME -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          
+          if [ -z "$ALB_URL" ]; then
+            echo "ALB is being provisioned. Check status with:"
+            echo "kubectl get ingress -n ${{ env.K8S_NAMESPACE }}"
+          else
+            echo ""
+            echo "=========================================="
+            echo "DEPLOYMENT SUCCESSFUL"
+            echo "=========================================="
+            echo "Payment API URL: http://$ALB_URL/payments"
+            echo "WireMock PSP URL: http://$ALB_URL/psp"
+            echo "Health Check: http://$ALB_URL/payments/health"
+            echo "=========================================="
+          fi

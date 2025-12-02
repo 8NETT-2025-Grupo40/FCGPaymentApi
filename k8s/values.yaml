@@ -1,0 +1,159 @@
+# Configuração da imagem Docker no ECR (Elastic Container Registry)
+# O workflow do GitHub Actions sobrescreve a tag com o SHA do commit
+image:
+  repository: "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-payment-api"
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Imagem WireMock (sidecar PSP mock)
+wiremock:
+  repository: "478511033947.dkr.ecr.us-east-1.amazonaws.com/fcg-psp-wiremock"
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Imagem AWS OTEL Collector (sidecar observability)
+otelCollector:
+  repository: "public.ecr.aws/aws-observability/aws-otel-collector"
+  tag: "v0.45.0"
+  pullPolicy: IfNotPresent
+
+# Número de pods que serão criados inicialmente
+# O HPA (Horizontal Pod Autoscaler) pode aumentar/diminuir baseado em carga
+# Reduzido para 1 devido ao limite de 8 pods/node em t3a.small
+replicaCount: 1
+
+# Portas dos containers
+containerPort: 5066      # Payment API
+wiremockPort: 5166       # WireMock PSP mock
+otelCollectorPort: 4317  # OTEL Collector gRPC
+
+# Service expõe os pods internamente no cluster
+# ClusterIP = apenas acessível dentro do cluster (não exposto externamente)
+service:
+  type: ClusterIP
+  # Porta para Payment API
+  port: 80
+  targetPort: 5066
+  # Porta para WireMock (exposta externamente via /psp)
+  wiremockPort: 80
+  wiremockTargetPort: 5166
+
+# Ingress cria um ALB (Application Load Balancer) para acesso externo
+# O AWS Load Balancer Controller converte esse recurso em um ALB real na AWS
+ingress:
+  enabled: true
+  className: alb  # usa o AWS Load Balancer Controller
+  host: ""  # deixe vazio para aceitar qualquer hostname
+  annotations:
+    # scheme: internet-facing = ALB público (acessível pela internet)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # target-type: ip = ALB roteia diretamente para IPs dos pods (mais eficiente)
+    alb.ingress.kubernetes.io/target-type: ip
+    # group.name: permite múltiplos Ingress compartilharem o mesmo ALB
+    # Todas as APIs FCG (User, Payment, Game) usarão o mesmo ALB
+    alb.ingress.kubernetes.io/group.name: fcg
+    # healthcheck-path: endpoint usado pelo ALB para verificar saúde dos pods
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTP", "Port": "80", "StatusCode": "HTTP_301"}}'
+  
+  # Paths para Payment API - corresponde ao roteamento ECS atual
+  paths:
+    - path: /payments
+      pathType: Prefix
+      service: api  # Roteia para service da API
+    - path: /psp
+      pathType: Prefix
+      service: wiremock  # Roteia para service do WireMock (exposto externamente)
+    - path: /health
+      pathType: Prefix
+      service: api  # ALB healthcheck endpoint
+
+# Recursos garantidos (requests) e limites (limits) para cada container
+# requests: Kubernetes garante esses recursos ao agendar o pod
+# limits: Valores máximos que o container pode usar (exceder memory = pod é morto)
+resources:
+  # Payment API container
+  api:
+    requests:
+      cpu: 150m      # 0.15 CPU
+      memory: 256Mi  # 256 megabytes
+    limits:
+      cpu: 750m      # 0.75 CPU
+      memory: 768Mi  # 768 megabytes
+  
+  # WireMock sidecar (mais leve)
+  wiremock:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  # OTEL Collector sidecar (leve)
+  otelCollector:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# Variáveis de ambiente não sensíveis (valores públicos)
+env:
+  ASPNETCORE_URLS: "http://+:5066"
+  ASPNETCORE_ENVIRONMENT: "Production"
+  AWS__Region: "us-east-1"
+  # WireMock e OTEL são sidecars - comunicação via localhost
+  Psp__WIREMOCK_URL: "http://localhost:5166"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317"
+
+# Secrets sensíveis são gerenciados pelo External Secrets Operator
+# Sincroniza automaticamente do AWS Secrets Manager para Kubernetes Secrets
+secrets:
+  # Referências aos secrets existentes no AWS Secrets Manager
+  connectionString:
+    awsSecretName: "fcg-api-payment-connection-string"
+    awsSecretKey: ""  # Secret é string simples, não JSON
+  sqsQueueUrl:
+    awsSecretName: "sqs-payment"
+    awsSecretKey: ""  # Secret é string simples, não JSON
+
+# HPA (Horizontal Pod Autoscaler) - escalonamento automático baseado em métricas
+# Aumenta/diminui número de pods automaticamente baseado em carga
+autoscaling:
+  enabled: true
+  minReplicas: 1  # reduzido devido ao limite de 8 pods/node em t3a.small
+  maxReplicas: 2  # máximo ajustado para não exceder capacidade do cluster
+  cpu: 60         # escala quando CPU média > 60%
+  memory: 70      # escala quando memória média > 70%
+
+# ServiceAccount com IRSA (IAM Roles for Service Accounts)
+# Permite que pods assumam roles IAM sem credenciais estáticas
+serviceAccount:
+  create: false  # false porque o eksctl cria durante o deploy (workflow)
+  name: "fcg-payment-api-sa"  # deve corresponder ao nome usado no workflow
+  annotations: {}  # eksctl injeta automaticamente eks.amazonaws.com/role-arn
+
+# Tempo de espera para graceful shutdown (OutboxDispatcher precisa finalizar)
+terminationGracePeriodSeconds: 60
+
+# Probes de saúde
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 5066
+  initialDelaySeconds: 30
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 5066
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3

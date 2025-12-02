@@ -1,0 +1,19 @@
+# Service: expõe os pods internamente no cluster
+# Dois Services apontam para o mesmo Deployment, mas expõem portas diferentes
+# Service 1: Payment API (porta 5066)
+# Service 2: WireMock (porta 5166) - arquivo separado service-wiremock.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "fcg-payment-api.fullname" . }}
+  labels:
+    {{- include "fcg-payment-api.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fcg-payment-api.selectorLabels" . | nindent 4 }}

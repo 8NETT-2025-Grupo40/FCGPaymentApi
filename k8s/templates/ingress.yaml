@@ -1,0 +1,38 @@
+{{- if .Values.ingress.enabled }}
+# Ingress: define regras de roteamento HTTP/HTTPS
+# O AWS Load Balancer Controller converte isso em um ALB (Application Load Balancer)
+# Replica o roteamento da ECS: /payments → API, /psp → WireMock
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "fcg-payment-api.fullname" . }}
+  labels:
+    {{- include "fcg-payment-api.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host }}
+      {{- end }}
+      http:
+        paths:
+          {{- range .Values.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- if eq .service "api" }}
+                name: {{ include "fcg-payment-api.fullname" $ }}
+                {{- else if eq .service "wiremock" }}
+                name: {{ include "fcg-payment-api.fullname" $ }}-wiremock
+                {{- end }}
+                port:
+                  {{- if eq .service "api" }}
+                  number: {{ $.Values.service.port }}
+                  {{- else if eq .service "wiremock" }}
+                  number: {{ $.Values.service.wiremockPort }}
+                  {{- end }}
+          {{- end }}
+{{- end }}

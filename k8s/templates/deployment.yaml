@@ -1,0 +1,109 @@
+# Deployment: gerencia os pods da aplicação (Payment API + sidecars)
+# Replica o comportamento da ECS Task Definition com 3 containers
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fcg-payment-api.fullname" . }}
+  labels:
+    {{- include "fcg-payment-api.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "fcg-payment-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fcg-payment-api.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "fcg-payment-api.serviceAccountName" . }}
+      # Graceful shutdown para OutboxDispatcher finalizar (batch de 20 msgs ~10s + buffer)
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        # Container 1: Payment API (principal)
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.containerPort }}
+              protocol: TCP
+          env:
+            # Variáveis não sensíveis (hardcoded)
+            - name: ASPNETCORE_URLS
+              value: {{ .Values.env.ASPNETCORE_URLS | quote }}
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.env.ASPNETCORE_ENVIRONMENT | quote }}
+            - name: AWS__Region
+              value: {{ .Values.env.AWS__Region | quote }}
+            # Comunicação localhost com sidecars (WireMock e OTEL)
+            - name: Psp__WIREMOCK_URL
+              value: {{ .Values.env.Psp__WIREMOCK_URL | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.env.OTEL_EXPORTER_OTLP_ENDPOINT | quote }}
+            # Secrets sensíveis (External Secrets → Kubernetes Secret)
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fcg-payment-api.fullname" . }}-secrets
+                  key: connectionString
+            - name: Sqs__PaymentConfirmedQueueUrl
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "fcg-payment-api.fullname" . }}-secrets
+                  key: sqsQueueUrl
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.api | nindent 12 }}
+        
+        # Container 2: WireMock PSP Mock (sidecar)
+        # Exposto externamente via /psp para testes e simulações
+        - name: wiremock
+          image: "{{ .Values.wiremock.repository }}:{{ .Values.wiremock.tag }}"
+          imagePullPolicy: {{ .Values.wiremock.pullPolicy }}
+          ports:
+            - name: wiremock
+              containerPort: {{ .Values.wiremockPort }}
+              protocol: TCP
+          # WireMock mappings já estão baked na imagem ECR (Infra/wiremock/Dockerfile)
+          # Não precisa ConfigMap - mantém padrão ECS
+          resources:
+            {{- toYaml .Values.resources.wiremock | nindent 12 }}
+          # Health check opcional (WireMock tem endpoint /__admin/health)
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.wiremockPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.wiremockPort }}
+            initialDelaySeconds: 3
+            periodSeconds: 5
+        
+        # Container 3: AWS OTEL Collector (sidecar)
+        # Coleta traces e envia para AWS X-Ray
+        - name: aws-otel-collector
+          image: "{{ .Values.otelCollector.repository }}:{{ .Values.otelCollector.tag }}"
+          imagePullPolicy: {{ .Values.otelCollector.pullPolicy }}
+          command:
+            - "/awscollector"
+            - "--config=/etc/ecs/ecs-xray.yaml"
+          ports:
+            - name: otlp-grpc
+              containerPort: {{ .Values.otelCollectorPort }}
+              protocol: TCP
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+          env:
+            - name: AWS_REGION
+              value: {{ .Values.env.AWS__Region | quote }}
+          resources:
+            {{- toYaml .Values.resources.otelCollector | nindent 12 }}
+          # OTEL Collector não precisa probes (não é crítico para saúde do pod)

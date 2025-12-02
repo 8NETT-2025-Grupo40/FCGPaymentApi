@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fcg-payment-api
+description: FCG Payment API (ASP.NET 8) para processamento de pagamentos no Amazon EKS
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
