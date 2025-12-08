@@ -197,9 +197,9 @@ Update-Database {MigrationName} -StartupProject Fcg.Payment.API -Connection "Ser
 
 * **CI** (PR/commit): restore, build, testes, análise estática.
 * **Docker**: imagem **ASP.NET 8**
-* **CD** (merge → main): build/push para **ECR**, atualização do **ECS Fargate Service** 
+* **CD** (merge → main): build/push para **ECR**, atualização do **EKS Service** 
 * **Infra AWS**:
-  * **ECS Fargate** + **ALB** (Path `/payments/*`)
+  * **EKS** + **ALB** (Path `/payments/*`)
   * **SQS FIFO** `fcgPayment.fifo` (+ DLQ)
   * **RDS** (SQL Server)
   * **CloudWatch Logs** / **X-Ray** / **OTel Collector**
