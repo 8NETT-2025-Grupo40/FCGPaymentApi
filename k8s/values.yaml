@@ -136,6 +136,12 @@ serviceAccount:
   name: "fcg-payment-api-sa"  # deve corresponder ao nome usado no workflow
   annotations: {}  # eksctl injeta automaticamente eks.amazonaws.com/role-arn
 
+# Annotations do pod para habilitar CloudWatch Application Signals
+# Auto-instrumentação via OpenTelemetry Operator
+podAnnotations:
+  # .NET auto-instrumentation (ASP.NET Core)
+  instrumentation.opentelemetry.io/inject-dotnet: "true"
+
 # Tempo de espera para graceful shutdown (OutboxDispatcher precisa finalizar)
 terminationGracePeriodSeconds: 60
 
