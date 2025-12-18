@@ -1,4 +1,4 @@
-﻿using Fcg.Payment.Infrastructure.Messaging;
+using Fcg.Payment.Infrastructure.Messaging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
 using OpenTelemetry.Extensions.AWS.Trace;
@@ -25,7 +25,19 @@ namespace Fcg.Payment.API.Setup
                 .ConfigureResource(r => r.AddService("fcg-payment-api"))
                 .WithTracing(t => t
                     // Spans automáticos para requisições ASP.NET Core
-                    .AddAspNetCoreInstrumentation(o => o.RecordException = true)
+                    .AddAspNetCoreInstrumentation(o =>
+                    {
+                        o.RecordException = true;
+                        // Enriquece span com http.route para CloudWatch Application Signals
+                        o.EnrichWithHttpRequest = (activity, httpRequest) =>
+                        {
+                            var endpoint = httpRequest.HttpContext.GetEndpoint();
+                            if (endpoint is Microsoft.AspNetCore.Routing.RouteEndpoint routeEndpoint)
+                            {
+                                activity.SetTag("http.route", routeEndpoint.RoutePattern.RawText);
+                            }
+                        };
+                    })
                     // Propaga trace nas chamadas entre serviços
                     .AddHttpClientInstrumentation()
                     // Spans de queries/persistência
@@ -38,3 +50,4 @@ namespace Fcg.Payment.API.Setup
         }
     }
 }
+
