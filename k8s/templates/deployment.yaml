@@ -1,5 +1,5 @@
-# Deployment: gerencia os pods da aplicação (Payment API + sidecars)
-# Replica o comportamento da ECS Task Definition com 3 containers
+# Deployment: gerencia os pods da aplicação (Payment API + WireMock sidecar)
+# CloudWatch Application Signals coleta traces automaticamente via DaemonSet
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,9 +42,10 @@ spec:
               value: {{ .Values.env.ASPNETCORE_ENVIRONMENT | quote }}
             - name: AWS__Region
               value: {{ .Values.env.AWS__Region | quote }}
-            # Comunicação localhost com sidecars (WireMock e OTEL)
+            # Comunicação localhost com sidecar WireMock
             - name: Psp__WIREMOCK_URL
               value: {{ .Values.env.Psp__WIREMOCK_URL | quote }}
+            # OTEL envia traces para CloudWatch Agent DaemonSet (Application Signals)
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ .Values.env.OTEL_EXPORTER_OTLP_ENDPOINT | quote }}
             # Secrets sensíveis (External Secrets → Kubernetes Secret)
@@ -89,25 +90,3 @@ spec:
               port: {{ .Values.wiremockPort }}
             initialDelaySeconds: 3
             periodSeconds: 5
-        
-        # Container 3: AWS OTEL Collector (sidecar)
-        # Coleta traces e envia para AWS X-Ray
-        - name: aws-otel-collector
-          image: "{{ .Values.otelCollector.repository }}:{{ .Values.otelCollector.tag }}"
-          imagePullPolicy: {{ .Values.otelCollector.pullPolicy }}
-          command:
-            - "/awscollector"
-            - "--config=/etc/ecs/ecs-xray.yaml"
-          ports:
-            - name: otlp-grpc
-              containerPort: {{ .Values.otelCollectorPort }}
-              protocol: TCP
-            - name: otlp-http
-              containerPort: 4318
-              protocol: TCP
-          env:
-            - name: AWS_REGION
-              value: {{ .Values.env.AWS__Region | quote }}
-          resources:
-            {{- toYaml .Values.resources.otelCollector | nindent 12 }}
-          # OTEL Collector não precisa probes (não é crítico para saúde do pod)

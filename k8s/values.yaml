@@ -11,12 +11,6 @@ wiremock:
   tag: "latest"
   pullPolicy: IfNotPresent
 
-# Imagem AWS OTEL Collector (sidecar observability)
-otelCollector:
-  repository: "public.ecr.aws/aws-observability/aws-otel-collector"
-  tag: "v0.45.0"
-  pullPolicy: IfNotPresent
-
 # Número de pods que serão criados inicialmente
 # O HPA (Horizontal Pod Autoscaler) pode aumentar/diminuir baseado em carga
 # Reduzido para 1 devido ao limite de 8 pods/node em t3a.small
@@ -25,7 +19,6 @@ replicaCount: 1
 # Portas dos containers
 containerPort: 5066      # Payment API
 wiremockPort: 5166       # WireMock PSP mock
-otelCollectorPort: 4317  # OTEL Collector gRPC
 
 # Service expõe os pods internamente no cluster
 # ClusterIP = apenas acessível dentro do cluster (não exposto externamente)
@@ -90,24 +83,17 @@ resources:
     limits:
       cpu: 200m
       memory: 256Mi
-  
-  # OTEL Collector sidecar (leve)
-  otelCollector:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
 
 # Variáveis de ambiente não sensíveis (valores públicos)
 env:
   ASPNETCORE_URLS: "http://+:5066"
   ASPNETCORE_ENVIRONMENT: "Production"
   AWS__Region: "us-east-1"
-  # WireMock e OTEL são sidecars - comunicação via localhost
+  # WireMock sidecar - comunicação via localhost
   Psp__WIREMOCK_URL: "http://localhost:5166"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://localhost:4317"
+  # OTEL envia traces para CloudWatch Agent DaemonSet (Application Signals)
+  # CloudWatch Agent coleta traces e envia para X-Ray e Application Signals
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://cloudwatch-agent.amazon-cloudwatch.svc.cluster.local:4315"
 
 # Secrets sensíveis são gerenciados pelo External Secrets Operator
 # Sincroniza automaticamente do AWS Secrets Manager para Kubernetes Secrets
@@ -135,12 +121,6 @@ serviceAccount:
   create: false  # false porque o eksctl cria durante o deploy (workflow)
   name: "fcg-payment-api-sa"  # deve corresponder ao nome usado no workflow
   annotations: {}  # eksctl injeta automaticamente eks.amazonaws.com/role-arn
-
-# Annotations do pod para habilitar CloudWatch Application Signals
-# Auto-instrumentação via OpenTelemetry Operator
-podAnnotations:
-  # .NET auto-instrumentation (ASP.NET Core)
-  instrumentation.opentelemetry.io/inject-dotnet: "true"
 
 # Tempo de espera para graceful shutdown (OutboxDispatcher precisa finalizar)
 terminationGracePeriodSeconds: 60
