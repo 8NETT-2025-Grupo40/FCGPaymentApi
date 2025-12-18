@@ -93,9 +93,7 @@ env:
   Psp__WIREMOCK_URL: "http://localhost:5166"
   # OTEL envia traces para CloudWatch Agent DaemonSet (Application Signals)
   # CloudWatch Agent coleta traces e envia para X-Ray e Application Signals
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://cloudwatch-agent.amazon-cloudwatch.svc.cluster.local:4316"
-  # Usar HTTP/protobuf - porta 4316 é o endpoint HTTP do CloudWatch Agent
-  # gRPC seria porta 4315 mas .NET OTLP exporter usa HTTP por padrão
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://cloudwatch-agent.amazon-cloudwatch.svc.cluster.local:4315"
 
 # Secrets sensíveis são gerenciados pelo External Secrets Operator
 # Sincroniza automaticamente do AWS Secrets Manager para Kubernetes Secrets
