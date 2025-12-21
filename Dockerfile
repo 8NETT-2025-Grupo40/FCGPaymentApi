@@ -1,10 +1,10 @@
 # ===============================
 # Stage 1: Runtime 
 # ===============================
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
 
 # Suporte a globalização (formatação de moeda, datas)
-#RUN apk add --no-cache icu-libs
+RUN apk add --no-cache icu-libs
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # Segurança: roda como usuário não-root que já existe na imagem
@@ -19,7 +19,7 @@ EXPOSE 5066
 # ===============================
 # Stage 2: Build/Publish
 # ===============================
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 ARG BUILD_CONFIGURATION=Release
 
 WORKDIR /src
