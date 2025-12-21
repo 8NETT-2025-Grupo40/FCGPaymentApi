@@ -58,9 +58,9 @@ ingress:
     - path: /psp
       pathType: Prefix
       service: wiremock  # Roteia para service do WireMock (exposto externamente)
-    - path: /health
-      pathType: Prefix
-      service: api  # ALB healthcheck endpoint
+#    - path: /health
+#      pathType: Prefix
+#      service: api  # ALB healthcheck endpoint
 
 # Recursos garantidos (requests) e limites (limits) para cada container
 # requests: Kubernetes garante esses recursos ao agendar o pod
