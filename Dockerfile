@@ -4,7 +4,7 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 
 # Suporte a globalização (formatação de moeda, datas)
-RUN apk add --no-cache icu-libs
+#RUN apk add --no-cache icu-libs
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # Segurança: roda como usuário não-root que já existe na imagem
