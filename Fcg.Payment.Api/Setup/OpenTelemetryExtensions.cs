@@ -1,6 +1,7 @@
 using Fcg.Payment.Infrastructure.Messaging;
 using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Extensions.AWS.Trace;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -43,11 +44,20 @@ namespace Fcg.Payment.API.Setup
                     // Spans de queries/persistência
                     .AddEntityFrameworkCoreInstrumentation()
                     .AddSource(PaymentTelemetry.FcgPaymentPublisherSourceName)
-                    // Exporta pro collector (ADOT/X-Ray)
-                    .AddOtlpExporter());
+                    // Exporta para CloudWatch Agent via OTLP gRPC
+                    .AddOtlpExporter(options =>
+                    {
+                        // Lê endpoint da variável de ambiente (ex: http://cloudwatch-agent...:4315)
+                        var endpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
+                        if (!string.IsNullOrEmpty(endpoint))
+                        {
+                            options.Endpoint = new Uri(endpoint);
+                        }
+                        // Força gRPC - CloudWatch Agent usa porta 4315 para gRPC
+                        options.Protocol = OtlpExportProtocol.Grpc;
+                    }));
 
             return services;
         }
     }
 }
-
